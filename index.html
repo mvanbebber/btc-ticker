@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>BTC Ticker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;700&display=swap">
+<style>
+/* Layout: white currency bar on top, black ticker body, canvas chart, pager dots. Single dark look. */
+:root{
+  --bg:#000; --top:#fff; --fg:#fff; --muted:#7c7c80; --dim:#3a3a3c;
+  --accent:#ec5a2a; --up:#3fbf3f; --down:#e2505f; --fear:#e2505f; --trend:#f0a830;
+  --price-font:"Roboto Condensed","SF Pro Display",-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --ui-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui-font);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.wrap{max-width:620px;margin:0 auto}
+.num{font-variant-numeric:tabular-nums}
+
+/* currency bar */
+.cur{background:var(--top);padding-top:env(safe-area-inset-top,0px)}
+.cur .wrap{display:flex;justify-content:center;gap:clamp(14px,5.5vw,30px);padding:22px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px))}
+.cur button{color:#000;font-weight:700;font-size:clamp(17px,4.6vw,21px);letter-spacing:.01em}
+.cur button[aria-pressed="true"]{color:var(--accent)}
+
+/* exchanges */
+.ex{display:flex;gap:clamp(20px,6vw,30px);overflow-x:auto;scrollbar-width:none;padding:22px max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
+.ex::-webkit-scrollbar{display:none}
+.ex button{color:#8e8e93;font-weight:700;font-size:clamp(17px,4.6vw,21px);white-space:nowrap}
+.ex button[aria-pressed="true"]{color:var(--accent)}
+
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* headline */
+.head{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding-top:26px;align-items:start}
+.price-row{display:flex;align-items:center;gap:6px;min-width:0}
+.live{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;transition:background .3s}
+.live.on{background:var(--up)}
+.live.blink{animation:blink .6s}
+@keyframes blink{50%{opacity:.25}}
+.price{font-family:var(--price-font);font-weight:700;font-size:clamp(46px,14.5vw,92px);line-height:.95;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
+.price.tick-up{color:var(--up)} .price.tick-down{color:var(--down)}
+.sub{color:var(--muted);font-size:clamp(17px,4.6vw,22px);margin-top:10px;white-space:nowrap}
+.sub b{font-weight:400;color:var(--fg)}
+.chg.down{color:var(--down)} .chg.up{color:var(--up)}
+.stats{display:grid;grid-template-columns:auto auto;gap:4px 14px;font-size:clamp(17px,5vw,23px);padding-top:4px}
+.stats dt{color:var(--muted)} .stats dd{margin:0;text-align:right}
+
+/* pills */
+.pills{display:flex;gap:10px;margin-top:26px;align-items:center}
+.pill-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.pill-scroll::-webkit-scrollbar{display:none}
+.pill{border:1.5px solid var(--dim);border-radius:999px;padding:8px 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
+.pill .sep{width:1px;height:18px;background:var(--dim)}
+.pill.fear{color:var(--fear)}
+.pill.greed{color:var(--up)}
+.pill.neutral{color:#d8c060}
+.pill.warn{color:var(--accent)}
+.pill .dot{width:10px;height:10px;border-radius:50%;background:var(--up)}
+.btc-ico{width:16px;height:16px;border:1.5px solid currentColor;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;font-weight:700}
+
+/* ranges */
+.ranges{display:flex;justify-content:space-between;gap:4px;margin-top:30px;overflow-x:auto;scrollbar-width:none}
+.ranges::-webkit-scrollbar{display:none}
+.ranges button{font-family:var(--price-font);font-weight:700;font-size:clamp(13px,3.7vw,20px);color:#8e8e93;padding:4px 1px;flex:none}
+.ranges button[aria-pressed="true"]{color:var(--accent)}
+
+/* pages */
+.pager{overflow:hidden;margin-top:10px}
+.track{display:flex;transition:transform .35s ease;touch-action:pan-y}
+.page{flex:0 0 100%;min-width:0}
+.chart-box{position:relative;height:clamp(420px,95vw,560px)}
+canvas{display:block;width:100%;height:100%}
+.vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:22px;font-size:clamp(15px,4.2vw,19px)}
+.vol-chip .pill{color:var(--fg)}
+.vol-chip .pill .dot{background:#ccc}
+.vol-chip .avg{color:#c7c7cc}
+.tip{position:absolute;pointer-events:none;background:#1c1c1e;border:1px solid var(--dim);border-radius:8px;padding:6px 9px;font-size:13px;white-space:nowrap;transform:translate(-50%,-100%)}
+.tip b{display:block;font-size:15px}
+.note{color:var(--muted);font-size:12px;min-height:16px;margin-top:4px}
+.loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}
+
+.dots{display:flex;justify-content:center;gap:22px;padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px))}
+.dots button{width:13px;height:13px;border-radius:50%;background:#48484a}
+.dots button[aria-current="true"]{background:#8e8e93}
+
+/* markets + trades */
+.list{width:100%;border-collapse:collapse;font-size:15px}
+.list th{color:var(--muted);font-weight:500;text-align:right;padding:10px 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #1c1c1e}
+.list th:first-child,.list td:first-child{text-align:left}
+.list td{padding:13px 4px;border-bottom:1px solid #1c1c1e;text-align:right;white-space:nowrap}
+.list tr.sel td:first-child{color:var(--accent)}
+.list tbody tr{cursor:pointer}
+.buy{color:var(--up)} .sell{color:var(--down)}
+.page h2{font-size:15px;color:var(--muted);font-weight:600;margin:6px 0 6px;letter-spacing:.04em;text-transform:uppercase}
+.scroll{max-height:clamp(420px,95vw,560px);overflow-y:auto}
+@media (prefers-reduced-motion:reduce){.track{transition:none}.price{transition:none}.live.blink{animation:none}}
+</style>
+</head>
+<body>
+<header class="cur"><div class="wrap" id="currencies" role="group" aria-label="Currency"></div></header>
+
+<main class="wrap">
+  <nav class="ex" id="exchanges" aria-label="Exchange"></nav>
+
+  <section class="head pad">
+    <div style="min-width:0">
+      <div class="price-row"><span class="live" id="live" title="Live"></span><span class="price num" id="price">—</span></div>
+      <div class="sub num"><span id="rangeLbl">1W</span>: <span class="chg" id="chg">—</span></div>
+      <div class="sub num">24H Volume: <b id="vol24">—</b></div>
+    </div>
+    <dl class="stats num">
+      <dt>Max:</dt><dd id="max">—</dd>
+      <dt>Min:</dt><dd id="min">—</dd>
+      <dt>Ask:</dt><dd id="ask">—</dd>
+      <dt>Bid:</dt><dd id="bid">—</dd>
+    </dl>
+  </section>
+
+  <div class="pills pad">
+    <div class="pill-scroll">
+      <span class="pill fear num" id="fng" title="Crypto Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></span>
+      <span class="pill num" id="dom" title="Bitcoin market-cap dominance"><span class="btc-ico">₿</span><span id="domTxt">BTC —</span></span>
+      <span class="pill warn num" id="wide" title="High–low range of the selected period, as a share of the low">WIDE —</span>
+      <span class="pill num" id="d24" title="24-hour change">24H —</span>
+    </div>
+    <button class="pill" id="tradesBtn" title="Show recent trades"><span class="dot"></span>Trades</button>
+  </div>
+
+  <div class="ranges pad" id="ranges" role="group" aria-label="Time range"></div>
+
+  <div class="pager" id="pager">
+    <div class="track" id="track">
+      <section class="page pad" aria-label="Chart">
+        <div class="chart-box" id="chartBox">
+          <canvas id="chart"></canvas>
+          <div class="vol-chip" id="volChip"><span class="pill"><span class="dot"></span><b>VOL</b> ›</span><span class="avg num" id="volAvg">Avg —</span></div>
+          <div class="tip" id="tip" hidden></div>
+          <div class="loading" id="loading">Loading chart…</div>
+        </div>
+        <div class="note" id="note"></div>
+      </section>
+      <section class="page pad" aria-label="Markets">
+        <h2>Markets</h2>
+        <div class="scroll"><table class="list num"><thead><tr><th>Exchange</th><th>Last</th><th>24H</th><th>Spread</th><th>Vol</th></tr></thead><tbody id="markets"></tbody></table></div>
+      </section>
+      <section class="page pad" aria-label="Trades">
+        <h2 id="tradesTitle">Recent trades</h2>
+        <div class="scroll"><table class="list num"><thead><tr><th>Time</th><th>Price</th><th>Amount BTC</th></tr></thead><tbody id="trades"></tbody></table></div>
+      </section>
+    </div>
+  </div>
+  <div class="dots" id="dots"></div>
+</main>
+
+<script>
+(() => {
+"use strict";
+/* ---------- config ---------- */
+const CURRENCIES = ["USD","EUR","BRL","CAD","CNY","JPY"];
+const RANGES = [
+  ["10m",600],["1H",3600],["3H",10800],["12H",43200],["1D",86400],["1W",604800],
+  ["1M",2592000],["3M",7776000],["6M",15552000],["1Y",31536000],["2Y",63072000],["5Y",157680000],["10Y",315360000]
+];
+const STATIC_FX = {USD:1,EUR:0.92,BRL:5.4,CAD:1.38,CNY:7.2,JPY:150};
+
+const j = async (url) => {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
+  try { const r = await fetch(url, {signal: ctl.signal}); if (!r.ok) throw new Error(r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+};
+const pickIv = (ivs, range, max) => {
+  const target = range / 240;
+  let iv = ivs.find(v => v >= target * 0.6) ?? ivs[ivs.length - 1];
+  while (range / iv > max && ivs.indexOf(iv) < ivs.length - 1) iv = ivs[ivs.indexOf(iv) + 1];
+  return iv;
+};
+// internal candle: [tSec, open, high, low, close, volume]
+
+/* ---------- exchange adapters (public REST, BTC/USD) ---------- */
+const CB = "https://api.exchange.coinbase.com", KR = "https://api.kraken.com/0/public",
+      BS = "https://www.bitstamp.net/api/v2", BF = "https://api-pub.bitfinex.com/v2",
+      GM = "https://api.gemini.com", BN = "https://data-api.binance.vision/api/v3";
+
+const EX = {
+  coinbase: {
+    name: "Coinbase",
+    async ticker() {
+      const [t, s] = await Promise.all([j(CB + "/products/BTC-USD/ticker"), j(CB + "/products/BTC-USD/stats")]);
+      return {last:+t.price, bid:+t.bid, ask:+t.ask, vol:+t.volume, open:+s.open, high:+s.high, low:+s.low};
+    },
+    async candles(range) {
+      const ivs = [60,300,900,3600,21600,86400];
+      const iv = pickIv(ivs, range, 300 * 13);
+      const now = Math.floor(Date.now() / 1000), start = now - range, span = iv * 300, reqs = [];
+      for (let a = start; a < now; a += span) {
+        const b = Math.min(now, a + span);
+        reqs.push(j(`${CB}/products/BTC-USD/candles?granularity=${iv}&start=${new Date(a*1000).toISOString()}&end=${new Date(b*1000).toISOString()}`));
+      }
+      const pages = await Promise.all(reqs);
+      return pages.flat().map(r => [r[0], r[3], r[2], r[1], r[4], r[5]]);
+    },
+    async trades() {
+      const d = await j(CB + "/products/BTC-USD/trades?limit=60");
+      return d.map(x => ({t: Date.parse(x.time) / 1000, p:+x.price, q:+x.size, buy: x.side === "sell"}));
+    }
+  },
+  kraken: {
+    name: "Kraken",
+    async ticker() {
+      const d = await j(KR + "/Ticker?pair=XBTUSD"); const r = Object.values(d.result)[0];
+      return {last:+r.c[0], bid:+r.b[0], ask:+r.a[0], vol:+r.v[1], open:+r.o, high:+r.h[1], low:+r.l[1]};
+    },
+    async candles(range) {
+      const iv = pickIv([60,300,900,1800,3600,14400,86400,604800], range, 720);
+      const since = Math.floor(Date.now() / 1000) - range;
+      const d = await j(`${KR}/OHLC?pair=XBTUSD&interval=${iv/60}&since=${since}`);
+      const rows = Object.entries(d.result).find(([k]) => k !== "last")[1];
+      return rows.map(r => [+r[0], +r[1], +r[2], +r[3], +r[4], +r[6]]);
+    },
+    async trades() {
+      const d = await j(KR + "/Trades?pair=XBTUSD&count=60");
+      const rows = Object.entries(d.result).find(([k]) => k !== "last")[1];
+      return rows.map(r => ({t:+r[2], p:+r[0], q:+r[1], buy: r[3] === "b"}));
+    }
+  },
+  bitstamp: {
+    name: "Bitstamp",
+    async ticker() {
+      const t = await j(BS + "/ticker/btcusd/");
+      return {last:+t.last, bid:+t.bid, ask:+t.ask, vol:+t.volume, open:+(t.open_24 ?? t.open), high:+t.high, low:+t.low};
+    },
+    async candles(range) {
+      const iv = pickIv([60,180,300,900,1800,3600,7200,14400,21600,43200,86400,259200], range, 1000);
+      const start = Math.floor(Date.now() / 1000) - range;
+      const d = await j(`${BS}/ohlc/btcusd/?step=${iv}&limit=1000&start=${start}`);
+      return d.data.ohlc.map(r => [+r.timestamp, +r.open, +r.high, +r.low, +r.close, +r.volume]);
+    },
+    async trades() {
+      const d = await j(BS + "/transactions/btcusd/?time=hour");
+      return d.slice(0, 60).map(x => ({t:+x.date, p:+x.price, q:+x.amount, buy: String(x.type) === "0"}));
+    }
+  },
+  bitfinex: {
+    name: "Bitfinex",
+    async ticker() {
+      const t = await j(BF + "/ticker/tBTCUSD");
+      return {last:t[6], bid:t[0], ask:t[2], vol:t[7], open:t[6] - t[4], high:t[8], low:t[9]};
+    },
+    async candles(range) {
+      const tf = {60:"1m",300:"5m",900:"15m",1800:"30m",3600:"1h",10800:"3h",21600:"6h",43200:"12h",86400:"1D",604800:"1W"};
+      const iv = pickIv(Object.keys(tf).map(Number), range, 10000);
+      const start = (Math.floor(Date.now() / 1000) - range) * 1000;
+      const d = await j(`${BF}/candles/trade:${tf[iv]}:tBTCUSD/hist?start=${start}&limit=10000&sort=1`);
+      return d.map(r => [r[0] / 1000, r[1], r[3], r[4], r[2], r[5]]);
+    },
+    async trades() {
+      const d = await j(BF + "/trades/tBTCUSD/hist?limit=60");
+      return d.map(r => ({t:r[1] / 1000, p:r[3], q:Math.abs(r[2]), buy:r[2] > 0}));
+    }
+  },
+  gemini: {
+    name: "Gemini",
+    async ticker() {
+      const [t, v1] = await Promise.all([j(GM + "/v2/ticker/btcusd"), j(GM + "/v1/pubticker/btcusd")]);
+      return {last:+t.close, bid:+t.bid, ask:+t.ask, vol:+v1.volume.BTC, open:+t.open, high:+t.high, low:+t.low};
+    },
+    async candles(range) {
+      const tf = {60:"1m",300:"5m",900:"15m",1800:"30m",3600:"1hr",21600:"6hr",86400:"1day"};
+      const iv = pickIv(Object.keys(tf).map(Number), range, 100000);
+      const d = await j(`${GM}/v2/candles/btcusd/${tf[iv]}`);
+      return d.map(r => [r[0] / 1000, r[1], r[2], r[3], r[4], r[5]]);
+    },
+    async trades() {
+      const d = await j(GM + "/v1/trades/btcusd?limit_trades=60");
+      return d.map(x => ({t:x.timestampms / 1000, p:+x.price, q:+x.amount, buy: x.type === "buy"}));
+    }
+  },
+  binance: {
+    name: "Binance",
+    async ticker() {
+      const t = await j(BN + "/ticker/24hr?symbol=BTCUSDT");
+      return {last:+t.lastPrice, bid:+t.bidPrice, ask:+t.askPrice, vol:+t.volume, open:+t.openPrice, high:+t.highPrice, low:+t.lowPrice};
+    },
+    async candles(range) {
+      const tf = {60:"1m",180:"3m",300:"5m",900:"15m",1800:"30m",3600:"1h",7200:"2h",14400:"4h",21600:"6h",43200:"12h",86400:"1d",259200:"3d",604800:"1w"};
+      const iv = pickIv(Object.keys(tf).map(Number), range, 1000);
+      const start = Date.now() - range * 1000;
+      const d = await j(`${BN}/klines?symbol=BTCUSDT&interval=${tf[iv]}&startTime=${start}&limit=1000`);
+      return d.map(r => [r[0] / 1000, +r[1], +r[2], +r[3], +r[4], +r[5]]);
+    },
+    async trades() {
+      const d = await j(BN + "/trades?symbol=BTCUSDT&limit=60");
+      return d.reverse().map(x => ({t:x.time / 1000, p:+x.price, q:+x.qty, buy: !x.isBuyerMaker}));
+    }
+  }
+};
+const EX_KEYS = Object.keys(EX);
+
+/* ---------- state ---------- */
+const store = {
+  get(k, d) { try { return localStorage.getItem("btct." + k) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("btct." + k, v); } catch {} }
+};
+const S = {
+  cur: store.get("cur", "USD"), ex: store.get("ex", "bitstamp"), range: store.get("range", "1W"),
+  fx: {...STATIC_FX}, fxLive: false, ticker: null, candles: [], candleSrc: "", sample: false, page: 0, lastPrice: null
+};
+if (!CURRENCIES.includes(S.cur)) S.cur = "USD";
+if (!EX[S.ex]) S.ex = "bitstamp";
+if (!RANGES.some(r => r[0] === S.range)) S.range = "1W";
+
+const $ = id => document.getElementById(id);
+const rate = () => S.fx[S.cur] || 1;
+const fmt = (v, cur = true) => {
+  if (v == null || !isFinite(v)) return "—";
+  const x = cur ? v * rate() : v;
+  const d = Math.abs(x) >= 1000 ? 0 : Math.abs(x) >= 1 ? 2 : 4;
+  return x.toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+};
+const fmtVol = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
+
+/* ---------- build controls ---------- */
+function buildGroup(el, items, current, onPick) {
+  el.innerHTML = "";
+  for (const [key, label] of items) {
+    const b = document.createElement("button");
+    b.textContent = label; b.dataset.key = key; b.setAttribute("aria-pressed", key === current);
+    b.addEventListener("click", () => {
+      el.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+      onPick(key);
+    });
+    el.appendChild(b);
+  }
+}
+buildGroup($("currencies"), CURRENCIES.map(c => [c, c]), S.cur, k => { S.cur = k; store.set("cur", k); renderAll(); });
+buildGroup($("exchanges"), EX_KEYS.map(k => [k, EX[k].name]), S.ex, k => {
+  S.ex = k; store.set("ex", k); S.ticker = null; renderHead(); loadTicker(); loadCandles(); if (S.page === 2) loadTrades();
+});
+buildGroup($("ranges"), RANGES.map(r => [r[0], r[0]]), S.range, k => { S.range = k; store.set("range", k); loadCandles(); });
+$("exchanges").querySelector('[aria-pressed="true"]')?.scrollIntoView({inline: "center", block: "nearest"});
+
+/* ---------- pager ---------- */
+const dots = $("dots");
+["Chart","Markets","Trades"].forEach((n, i) => {
+  const b = document.createElement("button"); b.setAttribute("aria-label", n);
+  b.addEventListener("click", () => goPage(i)); dots.appendChild(b);
+});
+function goPage(i) {
+  S.page = Math.max(0, Math.min(2, i));
+  $("track").style.transform = `translateX(${-100 * S.page}%)`;
+  [...dots.children].forEach((d, k) => d.setAttribute("aria-current", k === S.page));
+  if (S.page === 1) loadMarkets();
+  if (S.page === 2) loadTrades();
+  if (S.page === 0) draw();
+}
+$("tradesBtn").addEventListener("click", () => goPage(S.page === 2 ? 0 : 2));
+let sx = null, sy = null;
+$("track").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive: true});
+$("track").addEventListener("touchend", e => {
+  if (sx == null) return;
+  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && !chartTouch) goPage(S.page + (dx < 0 ? 1 : -1));
+});
+
+/* ---------- data loading ---------- */
+async function loadFx() {
+  try {
+    const d = await j("https://open.er-api.com/v6/latest/USD");
+    CURRENCIES.forEach(c => { if (d.rates?.[c]) S.fx[c] = d.rates[c]; }); S.fxLive = true;
+  } catch {
+    try {
+      const d = await j("https://api.frankfurter.app/latest?from=USD&to=" + CURRENCIES.filter(c => c !== "USD").join(","));
+      Object.assign(S.fx, d.rates); S.fxLive = true;
+    } catch {}
+  }
+  renderAll();
+}
+
+let tickerSeq = 0;
+async function loadTicker() {
+  const seq = ++tickerSeq, ex = S.ex;
+  try {
+    const t = await EX[ex].ticker();
+    if (seq !== tickerSeq || ex !== S.ex) return;
+    S.ticker = t; S.sample = false; $("live").classList.add("on");
+  } catch {
+    if (seq !== tickerSeq) return;
+    $("live").classList.remove("on");
+    if (S.sample) S.ticker = sampleTicker();
+  }
+  pushLivePrice(); renderHead();
+}
+
+let candleSeq = 0;
+async function loadCandles() {
+  const seq = ++candleSeq, range = RANGES.find(r => r[0] === S.range)[1];
+  $("loading").hidden = false; $("loading").textContent = "Loading chart…";
+  let data = null, src = EX[S.ex].name;
+  try { data = await EX[S.ex].candles(range); }
+  catch {
+    if (S.ex !== "binance") { try { data = await EX.binance.candles(range); src = "Binance (fallback)"; } catch {} }
+  }
+  if (seq !== candleSeq) return;
+  if (!data || !data.length) { data = sampleCandles(range); src = "sample"; S.sample = true; }
+  const cut = Date.now() / 1000 - range - 1;
+  data = data.filter(c => c[0] >= cut && isFinite(c[4])).sort((a, b) => a[0] - b[0]);
+  if (data.length < 2) { data = sampleCandles(range); src = "sample"; S.sample = true; }
+  S.candles = data; S.candleSrc = src;
+  if (src === "sample") S.ticker = sampleTicker();
+  $("loading").hidden = true;
+  pushLivePrice(); renderAll();
+}
+
+function pushLivePrice() {
+  const c = S.candles, t = S.ticker;
+  if (!t || !c.length || S.candleSrc === "sample") return;
+  const last = c[c.length - 1];
+  last[4] = t.last; last[2] = Math.max(last[2], t.last); last[3] = Math.min(last[3], t.last);
+}
+
+async function loadMarkets() {
+  const body = $("markets");
+  if (!body.children.length) body.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr>`;
+  const res = await Promise.all(EX_KEYS.map(k => EX[k].ticker().then(t => [k, t]).catch(() => [k, null])));
+  body.innerHTML = "";
+  for (const [k, t] of res) {
+    const tr = document.createElement("tr"); if (k === S.ex) tr.className = "sel";
+    const ch = t && t.open ? (t.last / t.open - 1) * 100 : null;
+    const spread = t ? (t.ask - t.bid) : null;
+    tr.innerHTML = `<td>${EX[k].name}</td><td>${t ? fmt(t.last) : "—"}</td>` +
+      `<td class="${ch == null ? "" : ch < 0 ? "sell" : "buy"}">${ch == null ? "—" : (ch > 0 ? "+" : "") + ch.toFixed(2) + "%"}</td>` +
+      `<td>${t ? fmt(spread) : "—"}</td><td>${t ? fmtVol(t.vol) : "unavailable"}</td>`;
+    tr.addEventListener("click", () => { $("exchanges").querySelector(`[data-key="${k}"]`).click(); goPage(0); });
+    body.appendChild(tr);
+  }
+}
+
+async function loadTrades() {
+  const body = $("trades"); $("tradesTitle").textContent = "Recent trades · " + EX[S.ex].name;
+  let list;
+  try { list = await EX[S.ex].trades(); } catch { list = null; }
+  if (!list) { body.innerHTML = `<tr><td colspan="3" style="color:var(--muted)">Trades from ${EX[S.ex].name} could not be loaded. Retrying…</td></tr>`; return; }
+  list.sort((a, b) => b.t - a.t);
+  body.innerHTML = list.slice(0, 60).map(x => {
+    const d = new Date(x.t * 1000);
+    return `<tr><td>${d.toLocaleTimeString("en-GB")}</td><td class="${x.buy ? "buy" : "sell"}">${fmt(x.p)}</td><td>${x.q.toFixed(5)}</td></tr>`;
+  }).join("");
+}
+
+async function loadSentiment() {
+  try {
+    const d = await j("https://api.alternative.me/fng/?limit=1"); const v = d.data[0];
+    $("fngVal").textContent = v.value; $("fngTxt").textContent = v.value_classification;
+    const n = +v.value; $("fng").className = "pill num " + (n < 45 ? "fear" : n > 55 ? "greed" : "neutral");
+  } catch { $("fngTxt").textContent = "Fear & Greed n/a"; }
+  try {
+    const d = await j("https://api.coingecko.com/api/v3/global");
+    $("domTxt").textContent = "BTC " + Math.round(d.data.market_cap_percentage.btc) + "%";
+  } catch { $("domTxt").textContent = "BTC dom. n/a"; }
+}
+
+/* ---------- sample data (used only when every feed fails) ---------- */
+function sampleCandles(range) {
+  const n = 200, iv = range / n, now = Date.now() / 1000; let p = 76000, out = [];
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < n; i++) {
+    const o = p; p = p * (1 + (rnd() - 0.53) * 0.012);
+    out.push([now - range + i * iv, o, Math.max(o, p) * 1.002, Math.min(o, p) * 0.998, p, rnd() < 0.08 ? 150 + rnd() * 300 : 20 + rnd() * 80]);
+  }
+  return out;
+}
+function sampleTicker() { const c = S.candles.length ? S.candles[S.candles.length - 1][4] : 64348; return {last:c, bid:c + 27, ask:c + 27, vol:1675, open:c * 1.01, high:c * 1.02, low:c * 0.99}; }
+
+/* ---------- render: headline ---------- */
+function renderHead() {
+  const t = S.ticker, c = S.candles;
+  const price = t ? t.last : c.length ? c[c.length - 1][4] : null;
+  const el = $("price");
+  el.textContent = fmt(price);
+  if (S.lastPrice != null && price != null && price !== S.lastPrice) {
+    el.classList.remove("tick-up", "tick-down"); void el.offsetWidth;
+    el.classList.add(price > S.lastPrice ? "tick-up" : "tick-down");
+    setTimeout(() => el.classList.remove("tick-up", "tick-down"), 900);
+    $("live").classList.remove("blink"); void $("live").offsetWidth; $("live").classList.add("blink");
+  }
+  S.lastPrice = price;
+  document.title = price != null ? `${fmt(price)} ${S.cur} · BTC` : "BTC Ticker";
+
+  $("rangeLbl").textContent = S.range;
+  if (c.length && price != null) {
+    const first = c[0][1] || c[0][4], diff = price - first, pct = diff / first * 100;
+    const ce = $("chg"); ce.className = "chg " + (diff < 0 ? "down" : "up");
+    ce.textContent = `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    const hi = Math.max(...c.map(x => x[2])), lo = Math.min(...c.map(x => x[3]));
+    $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
+    $("wide").textContent = `WIDE ${((hi - lo) / lo * 100).toFixed(1)}%`;
+  }
+  $("ask").textContent = t ? fmt(t.ask) : "—";
+  $("bid").textContent = t ? fmt(t.bid) : "—";
+  $("vol24").textContent = t ? fmtVol(t.vol) : "—";
+  if (t && t.open) {
+    const p = (t.last / t.open - 1) * 100, e = $("d24");
+    e.textContent = `24H ${p >= 0 ? "+" : ""}${p.toFixed(1)}%`; e.style.color = p < 0 ? "var(--down)" : "var(--up)";
+  }
+  const notes = [];
+  if (S.candleSrc === "sample") notes.push("Live data unavailable — showing sample data.");
+  else if (S.candleSrc.includes("fallback")) notes.push(`Chart from ${S.candleSrc}; ${EX[S.ex].name} history could not be loaded.`);
+  if (S.cur !== "USD") notes.push(`Converted from USD at ${S.fx[S.cur].toFixed(S.fx[S.cur] > 20 ? 1 : 3)} ${S.cur}${S.fxLive ? "" : " (approximate rate)"}.`);
+  $("note").textContent = notes.join(" ");
+}
+function renderAll() { renderHead(); draw(); if (S.page === 1) loadMarkets(); }
+
+/* ---------- render: chart ---------- */
+const cv = $("chart"), ctx = cv.getContext("2d"), box = $("chartBox");
+let geo = null, hoverX = null, chartTouch = false;
+
+function niceStep(span, n) {
+  const raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / mag; return (f < 1.5 ? 1 : f < 2.25 ? 2 : f < 3.5 ? 2.5 : f < 7.5 ? 5 : 10) * mag;
+}
+function timeTicks(t0, t1) {
+  const span = t1 - t0, out = [];
+  const pad = n => String(n).padStart(2, "0");
+  let step, fmtT, align;
+  if (span <= 1200) { step = 120; fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  else if (span <= 4000) { step = 900; fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  else if (span <= 11000) { step = 1800; fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  else if (span <= 44000) { step = 7200; fmtT = d => `${pad(d.getHours())}:00`; }
+  else if (span <= 90000) { step = 14400; fmtT = d => `${pad(d.getHours())}:00`; }
+  else if (span <= 700000) { step = 86400; fmtT = d => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`; align = "day"; }
+  else if (span <= 2700000) { step = 86400 * 5; fmtT = d => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`; align = "day"; }
+  else if (span <= 16000000) { step = "m1"; }
+  else if (span <= 32000000) { step = "m2"; }
+  else if (span <= 64000000) { step = "m4"; }
+  else { step = span <= 160000000 ? "y1" : "y2"; }
+  if (typeof step === "number") {
+    const tzOff = new Date().getTimezoneOffset() * 60;
+    let s = Math.ceil((t0 - tzOff) / step) * step + tzOff;
+    if (align === "day") { const d = new Date(t0 * 1000); d.setHours(24, 0, 0, 0); s = d / 1000; }
+    for (let t = s; t <= t1; t += step) out.push([t, fmtT(new Date(t * 1000))]);
+  } else {
+    const d = new Date(t0 * 1000); d.setDate(1); d.setHours(0, 0, 0, 0);
+    const mStep = {m1:1, m2:2, m4:4, y1:12, y2:24}[step];
+    if (mStep >= 12) d.setMonth(0); else d.setMonth(Math.floor(d.getMonth() / mStep) * mStep);
+    for (;;) {
+      d.setMonth(d.getMonth() + mStep); if (d / 1000 > t1) break;
+      const lbl = mStep >= 12 ? String(d.getFullYear()) : `${pad(d.getMonth() + 1)}.${String(d.getFullYear()).slice(2)}`;
+      out.push([d / 1000, lbl]);
+    }
+  }
+  return out;
+}
+
+function draw() {
+  const W = box.clientWidth, H = box.clientHeight; if (!W || !H) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const c = S.candles; if (c.length < 2) return;
+  const R = rate();
+  const labelW = Math.max(78, W * 0.13), x0 = 2, x1 = W - labelW - 6;
+  const pTop = 22, pBot = H * 0.62, vChipY = H * 0.665, vTop = H * 0.76, vBot = H - 34;
+  $("volChip").style.top = (vChipY - 22) + "px";
+
+  const t0 = c[0][0], t1 = c[c.length - 1][0];
+  const X = t => x0 + (t - t0) / (t1 - t0 || 1) * (x1 - x0);
+  const closes = c.map(k => k[4] * R);
+  const hi = Math.max(...c.map(k => k[2])) * R, lo = Math.min(...closes, ...c.map(k => k[3] * R).slice(-1));
+  const minC = Math.min(...closes), maxC = Math.max(...closes, hi);
+  const lowV = Math.min(minC, lo), padV = (maxC - lowV) * 0.04 || 1;
+  const yMin = lowV - padV, yMax = hi;
+  const Y = v => pBot - (v - yMin) / (yMax - yMin) * (pBot - pTop);
+
+  ctx.font = `500 ${Math.round(Math.min(17, W * 0.042))}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.textBaseline = "middle";
+
+  // vertical time gridlines
+  const ticks = timeTicks(t0, t1);
+  ctx.strokeStyle = "#2c2c2e"; ctx.lineWidth = 1; ctx.fillStyle = "#8e8e93"; ctx.textAlign = "center";
+  for (const [t, lbl] of ticks) {
+    const x = Math.round(X(t)) + .5; if (x < x0 + 26 || x > x1 - 20) continue;
+    ctx.beginPath(); ctx.moveTo(x, pTop - 10); ctx.lineTo(x, vBot + 4); ctx.stroke();
+    ctx.fillText(lbl, x, H - 12);
+  }
+
+  // horizontal price grid
+  ctx.setLineDash([3, 5]); ctx.textAlign = "left";
+  const step = niceStep(yMax - yMin, 4);
+  const labels = [[yMax, true]];
+  for (let v = Math.ceil(yMin / step) * step; v < yMax; v += step) if (Y(v) - Y(yMax) > 26) labels.push([v, false]);
+  const lastY = Y(closes[closes.length - 1]);
+  for (const [v] of labels) {
+    const y = Math.round(Y(v)) + .5;
+    ctx.strokeStyle = "#333"; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1 + 4, y); ctx.stroke();
+    if (Math.abs(y - lastY) > 22) { ctx.fillStyle = "#8e8e93"; ctx.fillText(fmt(v, false), x1 + 12, y); }
+  }
+  ctx.setLineDash([]);
+
+  // resistance-style trend line: regression of closes, lifted to the highest residual
+  const n = closes.length; let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  closes.forEach((v, i) => { sx += i; sy += v; sxy += i * v; sxx += i * i; });
+  const m = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), b0 = (sy - m * sx) / n;
+  const lift = Math.max(...closes.map((v, i) => v - (m * i + b0)));
+  const tl = i => m * i + b0 + lift;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, pTop - 20, x1 + 4, pBot - pTop + 30); ctx.clip();
+  ctx.setLineDash([9, 7]); ctx.strokeStyle = "#f0a830"; ctx.lineWidth = 2;
+  const ext = n * 0.03;
+  ctx.beginPath(); ctx.moveTo(X(t0) - (x1 - x0) * 0.03, Y(tl(-ext))); ctx.lineTo(x1, Y(tl(n - 1 + ext))); ctx.stroke();
+  ctx.restore(); ctx.setLineDash([]);
+
+  // price line: brown under-shadow + green line
+  const path = off => { ctx.beginPath(); c.forEach((k, i) => { const x = X(k[0]), y = Y(closes[i]) + off; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); };
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = "#7a4a1c"; ctx.lineWidth = 4; path(4); ctx.stroke();
+  ctx.strokeStyle = "#2f7d1f"; ctx.lineWidth = 4; path(1.5); ctx.stroke();
+  ctx.strokeStyle = "#6ccf4a"; ctx.lineWidth = 2; path(0); ctx.stroke();
+
+  // last price tag
+  const last = closes[n - 1], up = last >= (c[0][1] || c[0][4]) * R;
+  const tagTxt = fmt(last, false), tw = ctx.measureText(tagTxt).width + 18, th = 34;
+  const tx = x1 + 4, ty = Math.max(pTop, Math.min(pBot, lastY)) - th / 2;
+  ctx.fillStyle = up ? "#2f9e44" : "#d9465a";
+  roundRect(tx, ty, Math.min(tw, W - tx - 1), th, 6); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(tagTxt, tx + 9, ty + th / 2 + 1);
+
+  // volume
+  const vols = c.map(k => k[5] || 0), vMax = Math.max(...vols) || 1, vAvg = vols.reduce((a, b) => a + b, 0) / vols.length;
+  const bw = Math.max(1, Math.min(6, (x1 - x0) / n * 0.55));
+  ctx.fillStyle = "#d1d1d6";
+  c.forEach((k, i) => { const h = (vols[i] / vMax) * (vBot - vTop); ctx.fillRect(Math.round(X(k[0]) - bw / 2), vBot - h, bw, h); });
+  const avgY = Math.round(vBot - vAvg / vMax * (vBot - vTop)) + .5;
+  ctx.setLineDash([6, 6]); ctx.strokeStyle = "#636366"; ctx.beginPath(); ctx.moveTo(x0, avgY); ctx.lineTo(x1 + 4, avgY); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right";
+  ctx.fillText(fmtVol(vMax), W - 4, vTop); ctx.fillText(fmtVol(vAvg), W - 4, avgY);
+  $("volAvg").textContent = "Avg " + fmtVol(vAvg);
+
+  geo = {X, Y, x0, x1, pTop, pBot, vBot, closes};
+
+  // crosshair
+  if (hoverX != null) {
+    let bi = 0, bd = Infinity; c.forEach((k, i) => { const d = Math.abs(X(k[0]) - hoverX); if (d < bd) { bd = d; bi = i; } });
+    const x = X(c[bi][0]), y = Y(closes[bi]);
+    ctx.strokeStyle = "#8e8e93"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + .5, pTop - 10); ctx.lineTo(x + .5, vBot); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    const tip = $("tip"), d = new Date(c[bi][0] * 1000);
+    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVol(vols[bi])}`;
+    tip.hidden = false;
+    tip.style.left = Math.max(80, Math.min(W - 80, x)) + "px"; tip.style.top = Math.max(50, y - 14) + "px";
+  } else $("tip").hidden = true;
+}
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+const setHover = e => { const r = cv.getBoundingClientRect(); hoverX = e.clientX - r.left; draw(); };
+cv.addEventListener("pointermove", e => { if (e.pointerType === "mouse" || chartTouch) setHover(e); });
+cv.addEventListener("pointerdown", e => { if (e.pointerType !== "mouse") { chartTouch = true; setHover(e); } });
+const endHover = () => { hoverX = null; setTimeout(() => chartTouch = false, 50); draw(); };
+cv.addEventListener("pointerleave", endHover); cv.addEventListener("pointerup", e => { if (e.pointerType !== "mouse") endHover(); });
+cv.addEventListener("pointercancel", endHover);
+cv.style.touchAction = "pan-y";
+new ResizeObserver(() => draw()).observe(box);
+
+/* ---------- boot + polling ---------- */
+goPage(0); renderHead();
+loadFx(); loadTicker(); loadCandles(); loadSentiment();
+setInterval(() => { if (!document.hidden) { loadTicker(); draw(); } }, 5000);
+setInterval(() => { if (!document.hidden) loadCandles(); }, 60000);
+setInterval(() => { if (!document.hidden && S.page === 2) loadTrades(); if (!document.hidden && S.page === 1) loadMarkets(); }, 6000);
+setInterval(() => { if (!document.hidden) loadSentiment(); }, 600000);
+setInterval(() => { if (!document.hidden) loadFx(); }, 3600000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadTicker(); loadCandles(); } });
+})();
+</script>
+</body>
+</html>
