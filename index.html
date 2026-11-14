@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>BTC Ticker</title>
@@ -26,7 +26,11 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui-font);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
-body{min-height:100vh}
+/* Locked one-screen layout: nothing scrolls or bounces; the chart takes the leftover height */
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;display:flex;flex-direction:column;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+main.wrap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column}
+main.wrap>*{flex:none}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 .wrap{max-width:620px;margin:0 auto}
@@ -34,12 +38,12 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 
 /* currency bar */
 .cur{background:var(--top);padding-top:env(safe-area-inset-top,0px)}
-.cur .wrap{display:flex;justify-content:center;gap:clamp(14px,5.5vw,30px);padding:22px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px))}
+.cur .wrap{display:flex;justify-content:center;gap:clamp(14px,5.5vw,30px);padding:clamp(8px,2.2dvh,22px) max(16px,env(safe-area-inset-right,0px)) clamp(8px,2dvh,20px) max(16px,env(safe-area-inset-left,0px))}
 .cur button{color:#000;font-weight:700;font-size:clamp(17px,4.6vw,21px);letter-spacing:.01em}
 .cur button[aria-pressed="true"]{color:var(--accent)}
 
 /* exchanges */
-.ex{display:flex;gap:clamp(20px,6vw,30px);overflow-x:auto;scrollbar-width:none;padding:22px max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
+.ex{display:flex;gap:clamp(20px,6vw,30px);overflow-x:auto;scrollbar-width:none;padding:clamp(8px,2.2dvh,22px) max(16px,env(safe-area-inset-right,0px)) 4px max(16px,env(safe-area-inset-left,0px))}
 .ex::-webkit-scrollbar{display:none}
 .ex button{color:#8e8e93;font-weight:700;font-size:clamp(17px,4.6vw,21px);white-space:nowrap}
 .ex button[aria-pressed="true"]{color:var(--accent)}
@@ -47,25 +51,25 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* headline */
-.head{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding-top:26px;align-items:start}
+.head{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding-top:clamp(8px,2.6dvh,26px);align-items:start}
 .price-row{display:flex;align-items:center;gap:6px;min-width:0}
 .live{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;transition:background .3s}
 .live.on{background:var(--up)}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
-.price{font-family:var(--price-font);font-weight:700;font-size:clamp(46px,14.5vw,92px);line-height:.95;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
+.price{font-family:var(--price-font);font-weight:700;font-size:clamp(40px,min(14.5vw,9dvh),92px);line-height:.95;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
 .price.tick-up{color:var(--up)} .price.tick-down{color:var(--down)}
-.sub{color:var(--muted);font-size:clamp(17px,4.6vw,22px);margin-top:10px;white-space:nowrap}
+.sub{color:var(--muted);font-size:clamp(15px,min(4.6vw,2.6dvh),22px);margin-top:clamp(3px,1dvh,10px);white-space:nowrap}
 .sub b{font-weight:400;color:var(--fg)}
 .chg.down{color:var(--down)} .chg.up{color:var(--up)}
-.stats{display:grid;grid-template-columns:auto auto;gap:4px 14px;font-size:clamp(17px,5vw,23px);padding-top:4px}
+.stats{display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:clamp(15px,min(5vw,2.8dvh),23px);padding-top:4px}
 .stats dt{color:var(--muted)} .stats dd{margin:0;text-align:right}
 
 /* pills */
-.pills{display:flex;gap:10px;margin-top:26px;align-items:center}
+.pills{display:flex;gap:10px;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
 .pill-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;mask-image:linear-gradient(90deg,#000 88%,transparent)}
 .pill-scroll::-webkit-scrollbar{display:none}
-.pill{border:1.5px solid var(--dim);border-radius:999px;padding:8px 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
+.pill{border:1.5px solid var(--dim);border-radius:999px;padding:clamp(5px,0.9dvh,8px) 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
 .pill .sep{width:1px;height:18px;background:var(--dim)}
 .pill.fear{color:var(--fear)}
 .pill.greed{color:var(--up)}
@@ -75,16 +79,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .btc-ico{width:16px;height:16px;border:1.5px solid currentColor;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;font-weight:700}
 
 /* ranges */
-.ranges{display:flex;justify-content:space-between;gap:4px;margin-top:30px;overflow-x:auto;scrollbar-width:none}
+.ranges{display:flex;justify-content:space-between;gap:4px;margin-top:clamp(8px,2.8dvh,30px);overflow-x:auto;scrollbar-width:none}
 .ranges::-webkit-scrollbar{display:none}
 .ranges button{font-family:var(--price-font);font-weight:700;font-size:clamp(13px,3.7vw,20px);color:#8e8e93;padding:4px 1px;flex:none}
 .ranges button[aria-pressed="true"]{color:var(--accent)}
 
 /* pages */
-.pager{overflow:hidden;margin-top:10px}
-.track{display:flex;transition:transform .35s ease;touch-action:pan-y}
-.page{flex:0 0 100%;min-width:0}
-.chart-box{position:relative;height:clamp(420px,95vw,560px)}
+.pager{overflow:hidden;margin-top:6px}
+main.wrap>.pager{flex:1;min-height:0}
+.track{display:flex;height:100%;transition:transform .35s ease;touch-action:none}
+.page{flex:0 0 100%;min-width:0;height:100%;display:flex;flex-direction:column}
+.chart-box{position:relative;flex:1;min-height:0}
 canvas{display:block;width:100%;height:100%}
 .vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:22px;font-size:clamp(15px,4.2vw,19px)}
 .vol-chip .pill{color:var(--fg)}
@@ -92,10 +97,10 @@ canvas{display:block;width:100%;height:100%}
 .vol-chip .avg{color:#c7c7cc}
 .tip{position:absolute;pointer-events:none;background:#1c1c1e;border:1px solid var(--dim);border-radius:8px;padding:6px 9px;font-size:13px;white-space:nowrap;transform:translate(-50%,-100%)}
 .tip b{display:block;font-size:15px}
-.note{color:var(--muted);font-size:12px;min-height:16px;margin-top:4px}
+.note{flex:none;color:var(--muted);font-size:11px;line-height:14px;height:14px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}
 
-.dots{display:flex;justify-content:center;gap:22px;padding:22px 0 calc(28px + env(safe-area-inset-bottom,0px))}
+.dots{display:flex;justify-content:center;gap:22px;padding:clamp(6px,1.4dvh,14px) 0 calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
 .dots button{width:13px;height:13px;border-radius:50%;background:#48484a}
 .dots button[aria-current="true"]{background:#8e8e93}
 
@@ -107,8 +112,8 @@ canvas{display:block;width:100%;height:100%}
 .list tr.sel td:first-child{color:var(--accent)}
 .list tbody tr{cursor:pointer}
 .buy{color:var(--up)} .sell{color:var(--down)}
-.page h2{font-size:15px;color:var(--muted);font-weight:600;margin:6px 0 6px;letter-spacing:.04em;text-transform:uppercase}
-.scroll{max-height:clamp(420px,95vw,560px);overflow-y:auto}
+.page h2{flex:none;font-size:15px;color:var(--muted);font-weight:600;margin:6px 0 6px;letter-spacing:.04em;text-transform:uppercase}
+.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
 @media (prefers-reduced-motion:reduce){.track{transition:none}.price{transition:none}.live.blink{animation:none}}
 </style>
 </head>
@@ -575,8 +580,9 @@ function draw() {
   const c = S.candles; if (c.length < 2) return;
   const R = rate();
   const labelW = Math.max(78, W * 0.13), x0 = 2, x1 = W - labelW - 6;
-  const pTop = 22, pBot = H * 0.62, vChipY = H * 0.665, vTop = H * 0.76, vBot = H - 34;
-  $("volChip").style.top = (vChipY - 22) + "px";
+  const vBot = H - 30, vTop = Math.min(H * 0.76, vBot - 44), chipH = $("volChip").offsetHeight || 36;
+  const pTop = 22, pBot = Math.min(H * 0.62, vTop - chipH - 14), vChipY = (pBot + vTop) / 2;
+  $("volChip").style.top = (vChipY - chipH / 2) + "px";
 
   const t0 = c[0][0], t1 = c[c.length - 1][0];
   const X = t => x0 + (t - t0) / (t1 - t0 || 1) * (x1 - x0);
@@ -601,7 +607,7 @@ function draw() {
 
   // horizontal price grid
   ctx.setLineDash([3, 5]); ctx.textAlign = "left";
-  const step = niceStep(yMax - yMin, 4);
+  const step = niceStep(yMax - yMin, Math.max(2, Math.min(4, Math.floor((pBot - pTop) / 42))));
   const labels = [[yMax, true]];
   for (let v = Math.ceil(yMin / step) * step; v < yMax; v += step) if (Y(v) - Y(yMax) > 26) labels.push([v, false]);
   const lastY = Y(closes[closes.length - 1]);
@@ -647,7 +653,7 @@ function draw() {
   const avgY = Math.round(vBot - vAvg / vMax * (vBot - vTop)) + .5;
   ctx.setLineDash([6, 6]); ctx.strokeStyle = "#636366"; ctx.beginPath(); ctx.moveTo(x0, avgY); ctx.lineTo(x1 + 4, avgY); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right";
-  ctx.fillText(fmtVol(vMax), W - 4, vTop); ctx.fillText(fmtVol(vAvg), W - 4, avgY);
+  ctx.fillText(fmtVol(vMax), W - 4, vTop); if (avgY - vTop > 16) ctx.fillText(fmtVol(vAvg), W - 4, avgY);
   $("volAvg").textContent = "Avg " + fmtVol(vAvg);
 
   geo = {X, Y, x0, x1, pTop, pBot, vBot, closes};
@@ -674,7 +680,7 @@ cv.addEventListener("pointerdown", e => { if (e.pointerType !== "mouse") { chart
 const endHover = () => { hoverX = null; setTimeout(() => chartTouch = false, 50); draw(); };
 cv.addEventListener("pointerleave", endHover); cv.addEventListener("pointerup", e => { if (e.pointerType !== "mouse") endHover(); });
 cv.addEventListener("pointercancel", endHover);
-cv.style.touchAction = "pan-y";
+cv.style.touchAction = "none";
 new ResizeObserver(() => draw()).observe(box);
 
 /* ---------- boot + polling ---------- */

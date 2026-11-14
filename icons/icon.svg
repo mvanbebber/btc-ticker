@@ -1,6 +1,7 @@
 <svg id="i" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <rect width="512" height="512" fill="#000"></rect>
-  <text x="256" y="268" text-anchor="middle" font-family="Inter" font-weight="900" font-size="250" fill="#ec5a2a">₿</text>
+  <circle cx="256" cy="178" r="112" fill="#F7931A"></circle>
+  <text x="256" y="178" dy="0.35em" text-anchor="middle" font-family="Inter" font-weight="800" font-size="154" fill="#fff" transform="rotate(14 256 178)">₿</text>
   <line x1="92" y1="398" x2="430" y2="312" stroke="#f0a830" stroke-width="7" stroke-dasharray="20 14" stroke-linecap="round"></line>
   <g fill="none" stroke-linejoin="round" stroke-linecap="round">
     <path id="p" d="M92 424 L130 430 L150 400 L178 416 L204 408 L232 424 L262 388 L290 396 L316 364 L344 376 L372 348 L398 356 L420 332"></path>
