@@ -45,27 +45,26 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 /* exchanges */
 .ex{display:flex;gap:clamp(20px,6vw,30px);overflow-x:auto;scrollbar-width:none;padding:clamp(8px,2.2dvh,22px) max(16px,env(safe-area-inset-right,0px)) 4px max(16px,env(safe-area-inset-left,0px))}
 .ex::-webkit-scrollbar{display:none}
+.ex{-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent)}
 .ex button{color:#8e8e93;font-weight:700;font-size:clamp(17px,4.6vw,21px);white-space:nowrap}
 .ex button[aria-pressed="true"]{color:var(--accent)}
 
 .pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* headline */
-.head{display:grid;grid-template-columns:1fr auto;gap:clamp(4px,1.2dvh,12px) 12px;padding-top:clamp(8px,2.4dvh,24px);align-items:end}
-.price-row{grid-column:1/-1;display:flex;align-items:baseline;justify-content:center;gap:4px;min-width:0}
+.head{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,0.6dvh,6px) 16px;padding-top:clamp(8px,2.4dvh,24px);align-items:baseline}
+.price-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:clamp(4px,1.5vw,10px);min-width:0;margin-bottom:clamp(2px,1dvh,10px)}
 /* currency symbol before the price; grey until live prices arrive, then white */
-.live{font-family:var(--price-font);font-weight:700;font-size:clamp(28px,min(11vw,6.3dvh),64px);line-height:1;color:var(--muted);flex:none;transition:color .3s}
+.live{font-family:var(--price-font);font-weight:700;font-size:clamp(28px,min(11vw,6.3dvh),64px);line-height:1;transform:translateY(-0.04em);color:var(--muted);flex:none;transition:color .3s}
 .live.on{color:var(--fg)}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
 .price{font-family:var(--price-font);font-weight:700;font-size:clamp(52px,min(22vw,12.5dvh),128px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
 .price.tick-up{color:var(--up)} .price.tick-down{color:var(--down)}
-.sub{color:var(--muted);font-size:clamp(15px,min(4.6vw,2.6dvh),22px);margin-top:clamp(2px,0.6dvh,6px);white-space:nowrap}
-.sub:first-child{margin-top:0}
-.sub b{font-weight:400;color:var(--fg)}
+.kv{font-size:clamp(15px,min(4.5vw,2.6dvh),21px);white-space:nowrap;display:flex;gap:6px;align-items:baseline;min-width:0}
+.kv .k{color:var(--muted)}
+.kv.r{justify-content:space-between;gap:12px}
 .chg.down{color:var(--down)} .chg.up{color:var(--up)}
-.stats{display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:clamp(15px,min(5vw,2.8dvh),23px);padding-top:4px}
-.stats dt{color:var(--muted)} .stats dd{margin:0;text-align:right}
 
 /* pills */
 .pills{display:flex;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
@@ -87,17 +86,18 @@ a.pill:hover{border-color:currentColor}
 /* ranges */
 .ranges{display:flex;justify-content:space-between;gap:4px;margin-top:clamp(8px,2.8dvh,30px);overflow-x:auto;scrollbar-width:none}
 .ranges::-webkit-scrollbar{display:none}
-.ranges button{font-family:var(--price-font);font-weight:700;font-size:clamp(13px,3.7vw,20px);color:#8e8e93;padding:4px 1px;flex:none}
-.ranges button[aria-pressed="true"]{color:var(--accent)}
+.ranges button{font-family:var(--price-font);font-weight:700;font-size:clamp(13px,3.7vw,20px);color:#8e8e93;flex:none}
+.ranges button{padding:4px 7px;border-radius:7px}
+.ranges button[aria-pressed="true"]{color:var(--accent);background:#1f1410}
 
 /* chart area fills the rest of the screen */
 main.wrap>.page{flex:1;min-height:0;padding-right:max(4px,env(safe-area-inset-right,0px))}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px;padding-bottom:calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
 .chart-box{position:relative;flex:1;min-height:0}
 canvas{display:block;width:100%;height:100%}
-.vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:22px;font-size:clamp(15px,4.2vw,19px)}
-.vol-chip .pill{color:var(--fg)}
-.vol-chip .pill .dot{background:#ccc}
+.vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:16px;font-size:clamp(14px,3.8vw,17px)}
+.vol-tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;color:var(--fg);letter-spacing:.04em}
+.vol-tag .dot{width:9px;height:9px;border-radius:50%;background:#c7c7cc}
 .vol-chip .avg{color:#c7c7cc}
 .tip{position:absolute;pointer-events:none;background:#1c1c1e;border:1px solid var(--dim);border-radius:8px;padding:6px 9px;font-size:13px;white-space:nowrap;transform:translate(-50%,-100%)}
 .tip b{display:block;font-size:15px}
@@ -115,14 +115,10 @@ canvas{display:block;width:100%;height:100%}
 
   <section class="head pad">
     <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span></div>
-    <div style="min-width:0">
-      <div class="sub num"><span id="rangeLbl">1W</span>: <span class="chg" id="chg">—</span></div>
-      <div class="sub num">24H Volume: <b id="vol24">—</b></div>
-    </div>
-    <dl class="stats num">
-      <dt>Max:</dt><dd id="max">—</dd>
-      <dt>Min:</dt><dd id="min">—</dd>
-    </dl>
+    <div class="kv num"><span class="k"><span id="rangeLbl">1W</span>:</span><span class="chg" id="chg">—</span></div>
+    <div class="kv r num"><span class="k">Max</span><span id="max">—</span></div>
+    <div class="kv num"><span class="k">24H Vol:</span><span id="vol24">—</span></div>
+    <div class="kv r num"><span class="k">Min</span><span id="min">—</span></div>
   </section>
 
   <div class="pills pad">
@@ -138,7 +134,7 @@ canvas{display:block;width:100%;height:100%}
   <section class="page pad" aria-label="Chart">
         <div class="chart-box" id="chartBox">
           <canvas id="chart"></canvas>
-          <div class="vol-chip" id="volChip"><span class="pill"><span class="dot"></span><b>VOL</b> ›</span><span class="avg num" id="volAvg">Avg —</span></div>
+          <div class="vol-chip" id="volChip"><span class="vol-tag"><span class="dot"></span>VOL</span><span class="avg num" id="volAvg">Avg —</span></div>
           <div class="tip" id="tip" hidden></div>
           <div class="loading" id="loading">Loading chart…</div>
         </div>
@@ -431,7 +427,7 @@ function renderHead() {
     $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
     $("wide").textContent = `VOLA ${((hi - lo) / lo * 100).toFixed(1)}%`; fitFng();
   }
-  $("vol24").textContent = t ? fmtVol(t.vol) : "—";
+  $("vol24").textContent = t ? fmtVol(t.vol) + " BTC" : "—";
   const notes = [];
   if (S.candleSrc === "sample") notes.push("Live data unavailable — showing sample data.");
   else if (S.candleSrc.includes("fallback")) notes.push(`Chart from ${S.candleSrc}; ${EX[S.ex].name} history could not be loaded.`);
