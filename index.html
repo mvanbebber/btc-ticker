@@ -5,7 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>BTC Ticker</title>
+<title>BTC Ticker · Live Bitcoin Price, No Ads</title>
+<meta name="description" content="Free live Bitcoin price ticker with no ads. BTC price in USD, EUR, BRL, CAD, CNY and JPY from Coinbase, Kraken, Bitstamp, Bitfinex, Gemini and Binance, with charts, volume, Fear &amp; Greed index, dominance and volatility.">
+<link rel="canonical" href="https://mvanbebber.github.io/btc-ticker/">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BTC Ticker">
+<meta property="og:title" content="BTC Ticker · Live Bitcoin Price, No Ads">
+<meta property="og:description" content="Live Bitcoin price from six exchanges in six currencies, with charts, volume, Fear &amp; Greed, dominance and volatility. No ads, no sign-up.">
+<meta property="og:url" content="https://mvanbebber.github.io/btc-ticker/">
+<meta property="og:image" content="https://mvanbebber.github.io/btc-ticker/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="BTC Ticker: live Bitcoin price, no ads">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BTC Ticker · Live Bitcoin Price, No Ads">
+<meta name="twitter:description" content="Live Bitcoin price from six exchanges in six currencies. No ads, no sign-up.">
+<meta name="twitter:image" content="https://mvanbebber.github.io/btc-ticker/icons/og-image.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebApplication","name":"BTC Ticker","url":"https://mvanbebber.github.io/btc-ticker/",
+ "description":"Free live Bitcoin price ticker with no ads, showing BTC prices from six exchanges in six currencies with charts and market indicators.",
+ "applicationCategory":"FinanceApplication","operatingSystem":"Any","isAccessibleForFree":true,
+ "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://mvanbebber.github.io/btc-ticker/icons/og-image.png"}
+</script>
 <meta name="apple-mobile-web-app-title" content="BTC">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="manifest.webmanifest">
@@ -35,6 +57,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 .wrap{max-width:620px;margin:0 auto}
 .num{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* currency bar */
 .cur{background:var(--top);padding-top:env(safe-area-inset-top,0px)}
@@ -141,6 +164,8 @@ canvas{display:block;width:100%;height:100%}
 <header class="cur"><div class="wrap" id="currencies" role="group" aria-label="Currency"></div></header>
 
 <main class="wrap">
+  <h1 class="sr-only">BTC Ticker: live Bitcoin price</h1>
+  <p class="sr-only">A free live Bitcoin (BTC) price ticker with no ads and no sign-up. See the current Bitcoin price in US dollars, euros, Brazilian reais, Canadian dollars, Chinese yuan and Japanese yen, from Coinbase, Kraken, Bitstamp, Bitfinex, Gemini and Binance. Includes price charts from one day to ten years, 24-hour trading volume, the Crypto Fear and Greed Index, Bitcoin dominance and volatility.</p>
   <nav class="ex" id="exchanges" aria-label="Exchange"></nav>
 
   <section class="head pad">
@@ -641,7 +666,7 @@ function renderHead() {
     $("live").classList.remove("blink"); void $("live").offsetWidth; $("live").classList.add("blink");
   }
   S.lastPrice = price;
-  document.title = price != null ? `${fmt(price)} ${S.cur} · BTC` : "BTC Ticker";
+  document.title = price != null ? `${SYMBOL[S.cur]}${fmt(price)} · BTC Ticker` : "BTC Ticker · Live Bitcoin Price, No Ads";
 
   $("rangeLbl").textContent = S.range;
   if (c.length && price != null) {
