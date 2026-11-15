@@ -361,11 +361,30 @@ async function loadFx() {
   renderAll();
 }
 
+// Build ticker figures from roughly 24 hours of candles (used when the ticker request fails)
+const c24cache = {};
+async function tickerFromCandles(ex) {
+  const hit = c24cache[ex];
+  if (hit && Date.now() - hit.at < 60000) return hit.t;
+  const c = (await EX[ex].candles(86400)).filter(k => k[0] >= Date.now() / 1000 - 86400).sort((a, b) => a[0] - b[0]);
+  if (!c.length) throw new Error("no candles");
+  const last = c[c.length - 1][4];
+  const t = {last, bid: NaN, ask: NaN, open: c[0][1], high: Math.max(...c.map(k => k[2])), low: Math.min(...c.map(k => k[3])),
+             vol: c.reduce((a, k) => a + (+k[5] || 0), 0)};
+  c24cache[ex] = {at: Date.now(), t};
+  return t;
+}
 let tickerSeq = 0;
 async function loadTicker() {
   const seq = ++tickerSeq, ex = S.ex;
   try {
-    const t = await EX[ex].ticker();
+    let t = null;
+    try { t = await EX[ex].ticker(); } catch {}
+    // Ticker blocked or missing volume: work it out from the same exchange's last 24 hours of chart data
+    if (!t || !isFinite(t.last) || !isFinite(t.vol)) {
+      const d = await tickerFromCandles(ex);
+      t = t && isFinite(t.last) ? {...t, vol: d.vol} : d;
+    }
     if (seq !== tickerSeq || ex !== S.ex) return;
     S.ticker = t; S.sample = false; $("live").classList.add("on");
   } catch {
@@ -516,7 +535,7 @@ function renderHead() {
     $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
     const v = annualVol(c); $("wide").textContent = v == null ? "VOLA —" : `VOLA ${v.toFixed(v < 10 ? 1 : 0)}%`; fitFng();
   }
-  $("vol24").textContent = t ? fmtVol(t.vol) + " BTC" : "—";
+  $("vol24").textContent = t && isFinite(t.vol) ? fmtVol(t.vol) + " BTC" : "—";
   const notes = [];
   if (S.candleSrc === "sample") notes.push("Live data unavailable — showing sample data.");
   else if (S.candleSrc.includes("fallback")) notes.push(`Chart from ${S.candleSrc}; ${EX[S.ex].name} history could not be loaded.`);
