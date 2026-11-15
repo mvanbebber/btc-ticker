@@ -581,7 +581,35 @@ setInterval(() => { if (!document.hidden) { loadTicker(); draw(); } }, 5000);
 setInterval(() => { if (!document.hidden) loadCandles(); }, 60000);
 setInterval(() => { if (!document.hidden) loadSentiment(); }, 600000);
 setInterval(() => { if (!document.hidden) loadFx(); }, 3600000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadTicker(); loadCandles(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadTicker(); loadCandles(); checkForUpdate(); } });
+
+/* ---------- auto-update ----------
+   Fetches the page fresh from the server and compares its code with the code running now.
+   If they differ, it loads the new version. No version number to bump: any change to the
+   page's style or script counts. */
+const codeHash = doc => {
+  const txt = [...doc.querySelectorAll("style, script:not([src])")].map(e => e.textContent).join("\n");
+  let h = 2166136261;
+  for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+};
+const runningHash = codeHash(document);
+let checking = false;
+async function checkForUpdate() {
+  if (checking || !/^https?:/.test(location.protocol) || !navigator.onLine) return;
+  checking = true;
+  try {
+    // cache: "reload" skips the browser cache and also refreshes it with the new copy
+    const r = await fetch(location.pathname, {cache: "reload"});
+    if (!r.ok) return;
+    const fresh = new DOMParser().parseFromString(await r.text(), "text/html");
+    if (!fresh.querySelector("script:not([src])")) return;
+    const freshHash = codeHash(fresh);
+    if (freshHash !== runningHash) location.replace(location.pathname + "?v=" + freshHash);
+  } catch {} finally { checking = false; }
+}
+setTimeout(checkForUpdate, 3000);
+setInterval(() => { if (!document.hidden) checkForUpdate(); }, 300000);
 })();
 </script>
 </body>
