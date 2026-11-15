@@ -318,6 +318,8 @@ const fmt = (v, cur = true) => {
   const d = Math.abs(x) >= 1000 ? 0 : Math.abs(x) >= 1 ? 2 : 4;
   return x.toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
 };
+// Amount with the currency sign in front, e.g. $76,422 or R$407,485 (converts from USD like fmt)
+const money = (v, cur = true) => v == null || !isFinite(v) ? "—" : SYMBOL[S.cur] + fmt(v, cur);
 const fmtVol = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
 // Volume in BTC, shortened with K (thousand) / M (million): 424 BTC, 12.3K BTC
 const fmtVolU = v => {
@@ -530,9 +532,9 @@ function renderHead() {
   if (c.length && price != null) {
     const first = c[0][1] || c[0][4], diff = price - first, pct = diff / first * 100;
     const ce = $("chg"); ce.className = "chg " + (diff < 0 ? "down" : "up");
-    ce.textContent = `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    ce.textContent = `${diff >= 0 ? "+" : "−"}${money(Math.abs(diff))} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
     const hi = Math.max(...c.map(x => x[2])), lo = Math.min(...c.map(x => x[3]));
-    $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
+    $("max").textContent = money(hi); $("min").textContent = money(lo);
     const v = annualVol(c); $("wide").textContent = v == null ? "VOLA —" : `VOLA ${v.toFixed(v < 10 ? 1 : 0)}%`; fitFng();
   }
   $("vol24").textContent = t && isFinite(t.vol) ? fmtVol(t.vol) + " BTC" : "—";
