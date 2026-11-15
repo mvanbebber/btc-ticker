@@ -81,6 +81,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 /* currency symbol before the price; grey until live prices arrive, then white */
 .live{font-family:var(--price-font);font-weight:700;font-size:clamp(23px,min(8.8vw,5dvh),51px);line-height:1;transform:translateY(-0.04em);color:var(--muted);flex:none;transition:color .3s}
 .live.on{color:var(--fg)}
+/* invisible copy of the sign on the right, so the digits themselves sit in the center */
+.live-pad{visibility:hidden}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
 .price{font-family:var(--price-font);font-weight:700;font-size:clamp(42px,min(17.6vw,10dvh),102px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
@@ -170,7 +172,7 @@ canvas{display:block;width:100%;height:100%}
   <nav class="ex" id="exchanges" aria-label="Exchange"></nav>
 
   <section class="head pad">
-    <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span></div>
+    <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span><span class="live live-pad" id="livePad" aria-hidden="true">$</span></div>
     <div class="kv num"><span class="k"><span id="rangeLbl">1W</span>:</span><span class="chg" id="chg">—</span></div>
     <div class="kv r num"><span class="k">Max</span><span id="max">—</span></div>
     <div class="kv num"><span class="k">24H Vol:</span><span id="vol24">—</span></div>
@@ -658,7 +660,7 @@ function renderHead() {
   const price = t ? t.last : c.length ? c[c.length - 1][4] : null;
   const el = $("price");
   el.textContent = fmt(price);
-  $("live").textContent = SYMBOL[S.cur];
+  $("live").textContent = SYMBOL[S.cur]; $("livePad").textContent = SYMBOL[S.cur];
   fitPrice();
   if (S.lastPrice != null && price != null && price !== S.lastPrice) {
     el.classList.remove("tick-up", "tick-down"); void el.offsetWidth;
@@ -688,13 +690,14 @@ function renderHead() {
 // Shrink the price (and its symbol) when a long number, like a yen price, would not fit the width
 function fitPrice() {
   const row = document.querySelector(".price-row"), el = $("price"), sym = $("live");
-  row.style.fontSize = ""; el.style.fontSize = ""; sym.style.fontSize = "";
+  const pad = $("livePad");
+  row.style.fontSize = ""; el.style.fontSize = ""; sym.style.fontSize = ""; pad.style.fontSize = "";
   for (let i = 0; i < 4; i++) {
     const over = row.scrollWidth / row.clientWidth;
     if (over <= 1) break;
     const k = 0.97 / over;
     el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * k + "px";
-    sym.style.fontSize = parseFloat(getComputedStyle(sym).fontSize) * k + "px";
+    sym.style.fontSize = pad.style.fontSize = parseFloat(getComputedStyle(sym).fontSize) * k + "px";
   }
 }
 addEventListener("resize", fitPrice);
