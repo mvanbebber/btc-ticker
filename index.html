@@ -66,9 +66,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .stats dt{color:var(--muted)} .stats dd{margin:0;text-align:right}
 
 /* pills */
-.pills{display:flex;gap:10px;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
-.pill-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;mask-image:linear-gradient(90deg,#000 88%,transparent)}
-.pill-scroll::-webkit-scrollbar{display:none}
+.pills{display:flex;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
+.pill-row{display:flex;gap:clamp(5px,1.8vw,10px);flex:1;min-width:0;justify-content:space-between}
+.pill-row .pill{min-width:0;padding-inline:clamp(8px,2.6vw,14px);gap:clamp(5px,1.6vw,8px);font-size:clamp(12px,3.5vw,17px)}
+.pill-row .pill:first-child{flex:0 1 auto}
+.pill-row .pill:first-child #fngTxt{overflow:hidden;text-overflow:ellipsis}
 .pill{border:1.5px solid var(--dim);border-radius:999px;padding:clamp(5px,0.9dvh,8px) 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
 .pill .sep{width:1px;height:18px;background:var(--dim)}
 a.pill{text-decoration:none;cursor:pointer}
@@ -122,11 +124,10 @@ canvas{display:block;width:100%;height:100%}
   </section>
 
   <div class="pills pad">
-    <div class="pill-scroll">
+    <div class="pill-row">
       <a class="pill fear num" id="fng" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" title="Open the Crypto Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></a>
-      <span class="pill num" id="dom" title="Bitcoin market-cap dominance"><span class="btc-ico">₿</span><span id="domTxt">BTC —</span></span>
-      <span class="pill warn num" id="wide" title="High–low range of the selected period, as a share of the low">WIDE —</span>
-      <span class="pill num" id="d24" title="24-hour change">24H —</span>
+      <span class="pill num" id="dom" title="DOM: Bitcoin dominance, its share of the total crypto market"><span class="btc-ico">₿</span><span id="domTxt">DOM —</span></span>
+      <span class="pill warn num" id="wide" title="VOLA: volatility, the high–low range of the selected period as a share of the low">VOLA —</span>
     </div>
   </div>
 
@@ -361,16 +362,25 @@ function pushLivePrice() {
   last[4] = t.last; last[2] = Math.max(last[2], t.last); last[3] = Math.min(last[3], t.last);
 }
 
+let fngFull = null;
+// Show the full Fear & Greed label, shortening "Extreme" to "Ext." when the pill row is too narrow
+function fitFng() {
+  if (!fngFull) return;
+  const el = $("fngTxt"); el.textContent = fngFull;
+  if (el.scrollWidth > el.clientWidth) el.textContent = fngFull.replace(/^Extreme/, "Ext.");
+}
+addEventListener("resize", fitFng);
 async function loadSentiment() {
   try {
     const d = await j("https://api.alternative.me/fng/?limit=1"); const v = d.data[0];
-    $("fngVal").textContent = v.value; $("fngTxt").textContent = v.value_classification;
+    $("fngVal").textContent = v.value; fngFull = v.value_classification; fitFng();
     const n = +v.value; $("fng").className = "pill num " + (n < 45 ? "fear" : n > 55 ? "greed" : "neutral");
-  } catch { $("fngTxt").textContent = "Fear & Greed n/a"; }
+  } catch { $("fngTxt").textContent = "F&G n/a"; }
   try {
     const d = await j("https://api.coingecko.com/api/v3/global");
-    $("domTxt").textContent = "BTC " + Math.round(d.data.market_cap_percentage.btc) + "%";
-  } catch { $("domTxt").textContent = "BTC dom. n/a"; }
+    $("domTxt").textContent = "DOM " + Math.round(d.data.market_cap_percentage.btc) + "%";
+  } catch { $("domTxt").textContent = "DOM n/a"; }
+  fitFng();
 }
 
 /* ---------- sample data (used only when every feed fails) ---------- */
@@ -407,13 +417,9 @@ function renderHead() {
     ce.textContent = `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
     const hi = Math.max(...c.map(x => x[2])), lo = Math.min(...c.map(x => x[3]));
     $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
-    $("wide").textContent = `WIDE ${((hi - lo) / lo * 100).toFixed(1)}%`;
+    $("wide").textContent = `VOLA ${((hi - lo) / lo * 100).toFixed(1)}%`; fitFng();
   }
   $("vol24").textContent = t ? fmtVol(t.vol) : "—";
-  if (t && t.open) {
-    const p = (t.last / t.open - 1) * 100, e = $("d24");
-    e.textContent = `24H ${p >= 0 ? "+" : ""}${p.toFixed(1)}%`; e.style.color = p < 0 ? "var(--down)" : "var(--up)";
-  }
   const notes = [];
   if (S.candleSrc === "sample") notes.push("Live data unavailable — showing sample data.");
   else if (S.candleSrc.includes("fallback")) notes.push(`Chart from ${S.candleSrc}; ${EX[S.ex].name} history could not be loaded.`);
@@ -439,8 +445,8 @@ function timeTicks(t0, t1) {
   else if (span <= 11000) { step = 1800; fmtT = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
   else if (span <= 44000) { step = 7200; fmtT = d => `${pad(d.getHours())}:00`; }
   else if (span <= 90000) { step = 14400; fmtT = d => `${pad(d.getHours())}:00`; }
-  else if (span <= 700000) { step = 86400; fmtT = d => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`; align = "day"; }
-  else if (span <= 2700000) { step = 86400 * 5; fmtT = d => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}`; align = "day"; }
+  else if (span <= 700000) { step = 86400; fmtT = d => `${d.getDate()}/${d.getMonth() + 1}`; align = "day"; }
+  else if (span <= 2700000) { step = 86400 * 5; fmtT = d => `${d.getDate()}/${d.getMonth() + 1}`; align = "day"; }
   else if (span <= 16000000) { step = "m1"; }
   else if (span <= 32000000) { step = "m2"; }
   else if (span <= 64000000) { step = "m4"; }
