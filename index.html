@@ -52,10 +52,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 
 /* headline */
 .head{display:grid;grid-template-columns:1fr auto;gap:clamp(4px,1.2dvh,12px) 12px;padding-top:clamp(8px,2.4dvh,24px);align-items:end}
-.price-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}
-.price-row .live{margin-left:-20px}
-.live{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;transition:background .3s}
-.live.on{background:var(--up)}
+.price-row{grid-column:1/-1;display:flex;align-items:baseline;justify-content:center;gap:4px;min-width:0}
+/* currency symbol before the price; grey until live prices arrive, then white */
+.live{font-family:var(--price-font);font-weight:700;font-size:clamp(28px,min(11vw,6.3dvh),64px);line-height:1;color:var(--muted);flex:none;transition:color .3s}
+.live.on{color:var(--fg)}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
 .price{font-family:var(--price-font);font-weight:700;font-size:clamp(52px,min(22vw,12.5dvh),128px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
@@ -114,7 +114,7 @@ canvas{display:block;width:100%;height:100%}
   <nav class="ex" id="exchanges" aria-label="Exchange"></nav>
 
   <section class="head pad">
-    <div class="price-row"><span class="live" id="live" title="Live"></span><span class="price num" id="price">—</span></div>
+    <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span></div>
     <div style="min-width:0">
       <div class="sub num"><span id="rangeLbl">1W</span>: <span class="chg" id="chg">—</span></div>
       <div class="sub num">24H Volume: <b id="vol24">—</b></div>
@@ -155,6 +155,7 @@ const RANGES = [
   ["1D",86400],["1W",604800],
   ["1M",2592000],["3M",7776000],["6M",15552000],["1Y",31536000],["2Y",63072000],["5Y",157680000],["10Y",315360000]
 ];
+const SYMBOL = {USD:"$", EUR:"€", BRL:"R$", CAD:"C$", CNY:"CN¥", JPY:"¥"};
 const STATIC_FX = {USD:1,EUR:0.92,BRL:5.4,CAD:1.38,CNY:7.2,JPY:150};
 
 const j = async (url) => {
@@ -410,6 +411,8 @@ function renderHead() {
   const price = t ? t.last : c.length ? c[c.length - 1][4] : null;
   const el = $("price");
   el.textContent = fmt(price);
+  $("live").textContent = SYMBOL[S.cur];
+  fitPrice();
   if (S.lastPrice != null && price != null && price !== S.lastPrice) {
     el.classList.remove("tick-up", "tick-down"); void el.offsetWidth;
     el.classList.add(price > S.lastPrice ? "tick-up" : "tick-down");
@@ -435,6 +438,19 @@ function renderHead() {
   if (S.cur !== "USD") notes.push(`Converted from USD at ${S.fx[S.cur].toFixed(S.fx[S.cur] > 20 ? 1 : 3)} ${S.cur}${S.fxLive ? "" : " (approximate rate)"}.`);
   $("note").textContent = notes.join(" ");
 }
+// Shrink the price (and its symbol) when a long number, like a yen price, would not fit the width
+function fitPrice() {
+  const row = document.querySelector(".price-row"), el = $("price"), sym = $("live");
+  row.style.fontSize = ""; el.style.fontSize = ""; sym.style.fontSize = "";
+  for (let i = 0; i < 4; i++) {
+    const over = row.scrollWidth / row.clientWidth;
+    if (over <= 1) break;
+    const k = 0.97 / over;
+    el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * k + "px";
+    sym.style.fontSize = parseFloat(getComputedStyle(sym).fontSize) * k + "px";
+  }
+}
+addEventListener("resize", fitPrice);
 function renderAll() { renderHead(); draw(); }
 
 /* ---------- render: chart ---------- */
