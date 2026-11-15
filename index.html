@@ -51,15 +51,17 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* headline */
-.head{display:grid;grid-template-columns:1fr auto;gap:8px 12px;padding-top:clamp(8px,2.6dvh,26px);align-items:start}
-.price-row{display:flex;align-items:center;gap:6px;min-width:0}
+.head{display:grid;grid-template-columns:1fr auto;gap:clamp(4px,1.2dvh,12px) 12px;padding-top:clamp(8px,2.4dvh,24px);align-items:end}
+.price-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0}
+.price-row .live{margin-left:-20px}
 .live{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;transition:background .3s}
 .live.on{background:var(--up)}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
-.price{font-family:var(--price-font);font-weight:700;font-size:clamp(40px,min(14.5vw,9dvh),92px);line-height:.95;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
+.price{font-family:var(--price-font);font-weight:700;font-size:clamp(52px,min(22vw,12.5dvh),128px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
 .price.tick-up{color:var(--up)} .price.tick-down{color:var(--down)}
-.sub{color:var(--muted);font-size:clamp(15px,min(4.6vw,2.6dvh),22px);margin-top:clamp(3px,1dvh,10px);white-space:nowrap}
+.sub{color:var(--muted);font-size:clamp(15px,min(4.6vw,2.6dvh),22px);margin-top:clamp(2px,0.6dvh,6px);white-space:nowrap}
+.sub:first-child{margin-top:0}
 .sub b{font-weight:400;color:var(--fg)}
 .chg.down{color:var(--down)} .chg.up{color:var(--up)}
 .stats{display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:clamp(15px,min(5vw,2.8dvh),23px);padding-top:4px}
@@ -89,7 +91,7 @@ a.pill:hover{border-color:currentColor}
 .ranges button[aria-pressed="true"]{color:var(--accent)}
 
 /* chart area fills the rest of the screen */
-main.wrap>.page{flex:1;min-height:0}
+main.wrap>.page{flex:1;min-height:0;padding-right:max(4px,env(safe-area-inset-right,0px))}
 .page{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px;padding-bottom:calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
 .chart-box{position:relative;flex:1;min-height:0}
 canvas{display:block;width:100%;height:100%}
@@ -112,8 +114,8 @@ canvas{display:block;width:100%;height:100%}
   <nav class="ex" id="exchanges" aria-label="Exchange"></nav>
 
   <section class="head pad">
+    <div class="price-row"><span class="live" id="live" title="Live"></span><span class="price num" id="price">—</span></div>
     <div style="min-width:0">
-      <div class="price-row"><span class="live" id="live" title="Live"></span><span class="price num" id="price">—</span></div>
       <div class="sub num"><span id="rangeLbl">1W</span>: <span class="chg" id="chg">—</span></div>
       <div class="sub num">24H Volume: <b id="vol24">—</b></div>
     </div>
@@ -476,7 +478,10 @@ function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   const c = S.candles; if (c.length < 2) return;
   const R = rate();
-  const labelW = Math.max(78, W * 0.13), x0 = 2, x1 = W - labelW - 6;
+  ctx.font = `500 ${Math.round(Math.min(17, W * 0.042))}px ${getComputedStyle(document.body).fontFamily}`;
+  const maxLbl = fmt(Math.max(...c.map(k => k[2])) * R * 1.02, false);
+  const tagW = Math.ceil(ctx.measureText(maxLbl).width) + 14;
+  const x0 = 2, x1 = W - tagW - 4;
   const vBot = H - 30, vTop = Math.min(H * 0.76, vBot - 44), chipH = $("volChip").offsetHeight || 36;
   const pTop = 22, pBot = Math.min(H * 0.62, vTop - chipH - 14), vChipY = (pBot + vTop) / 2;
   $("volChip").style.top = (vChipY - chipH / 2) + "px";
@@ -490,7 +495,6 @@ function draw() {
   const yMin = lowV - padV, yMax = hi;
   const Y = v => pBot - (v - yMin) / (yMax - yMin) * (pBot - pTop);
 
-  ctx.font = `500 ${Math.round(Math.min(17, W * 0.042))}px ${getComputedStyle(document.body).fontFamily}`;
   ctx.textBaseline = "middle";
 
   // vertical time gridlines
@@ -511,7 +515,7 @@ function draw() {
   for (const [v] of labels) {
     const y = Math.round(Y(v)) + .5;
     ctx.strokeStyle = "#333"; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1 + 4, y); ctx.stroke();
-    if (Math.abs(y - lastY) > 22) { ctx.fillStyle = "#8e8e93"; ctx.fillText(fmt(v, false), x1 + 12, y); }
+    if (Math.abs(y - lastY) > 22) { ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right"; ctx.fillText(fmt(v, false), W - 2, y); }
   }
   ctx.setLineDash([]);
 
@@ -536,11 +540,11 @@ function draw() {
 
   // last price tag
   const last = closes[n - 1], up = last >= (c[0][1] || c[0][4]) * R;
-  const tagTxt = fmt(last, false), tw = ctx.measureText(tagTxt).width + 18, th = 34;
-  const tx = x1 + 4, ty = Math.max(pTop, Math.min(pBot, lastY)) - th / 2;
+  const tagTxt = fmt(last, false), tw = Math.max(tagW, ctx.measureText(tagTxt).width + 14), th = 32;
+  const tx = W - tw, ty = Math.max(pTop, Math.min(pBot, lastY)) - th / 2;
   ctx.fillStyle = up ? "#2f9e44" : "#d9465a";
-  roundRect(tx, ty, Math.min(tw, W - tx - 1), th, 6); ctx.fill();
-  ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(tagTxt, tx + 9, ty + th / 2 + 1);
+  roundRect(tx, ty, tw, th, 6); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText(tagTxt, W - 7, ty + th / 2 + 1);
 
   // volume
   const vols = c.map(k => k[5] || 0), vMax = Math.max(...vols) || 1, vAvg = vols.reduce((a, b) => a + b, 0) / vols.length;
@@ -550,7 +554,7 @@ function draw() {
   const avgY = Math.round(vBot - vAvg / vMax * (vBot - vTop)) + .5;
   ctx.setLineDash([6, 6]); ctx.strokeStyle = "#636366"; ctx.beginPath(); ctx.moveTo(x0, avgY); ctx.lineTo(x1 + 4, avgY); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right";
-  ctx.fillText(fmtVol(vMax), W - 4, vTop); if (avgY - vTop > 16) ctx.fillText(fmtVol(vAvg), W - 4, avgY);
+  ctx.fillText(fmtVol(vMax), W - 2, vTop); if (avgY - vTop > 16) ctx.fillText(fmtVol(vAvg), W - 2, avgY);
   $("volAvg").textContent = "Avg " + fmtVol(vAvg);
 
   geo = {X, Y, x0, x1, pTop, pBot, vBot, closes};
