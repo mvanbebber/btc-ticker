@@ -79,11 +79,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .head{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,0.6dvh,6px) 16px;padding-top:clamp(8px,2.4dvh,24px);align-items:baseline}
 .price-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:clamp(4px,1.5vw,10px);min-width:0;margin-bottom:clamp(2px,1dvh,10px)}
 /* currency symbol before the price; grey until live prices arrive, then white */
-.live{font-family:var(--price-font);font-weight:700;font-size:clamp(28px,min(11vw,6.3dvh),64px);line-height:1;transform:translateY(-0.04em);color:var(--muted);flex:none;transition:color .3s}
+.live{font-family:var(--price-font);font-weight:700;font-size:clamp(23px,min(8.8vw,5dvh),51px);line-height:1;transform:translateY(-0.04em);color:var(--muted);flex:none;transition:color .3s}
 .live.on{color:var(--fg)}
 .live.blink{animation:blink .6s}
 @keyframes blink{50%{opacity:.25}}
-.price{font-family:var(--price-font);font-weight:700;font-size:clamp(52px,min(22vw,12.5dvh),128px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
+.price{font-family:var(--price-font);font-weight:700;font-size:clamp(42px,min(17.6vw,10dvh),102px);line-height:.92;letter-spacing:-.01em;white-space:nowrap;transition:color .5s}
 .price.tick-up{color:var(--up)} .price.tick-down{color:var(--down)}
 .kv{font-size:clamp(15px,min(4.5vw,2.6dvh),21px);white-space:nowrap;display:flex;gap:6px;align-items:baseline;min-width:0}
 .kv .k{color:var(--muted)}
