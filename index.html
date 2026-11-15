@@ -74,8 +74,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .pill-row .pill:first-child #fngTxt{overflow:hidden;text-overflow:ellipsis}
 .pill{border:1.5px solid var(--dim);border-radius:999px;padding:clamp(5px,0.9dvh,8px) 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
 .pill .sep{width:1px;height:18px;background:var(--dim)}
-a.pill{text-decoration:none;cursor:pointer}
-a.pill:hover{border-color:currentColor}
+button.pill{cursor:pointer}
+button.pill:hover{border-color:currentColor}
 .pill.fear{color:var(--fear)}
 .pill.greed{color:var(--up)}
 .pill.neutral{color:#d8c060}
@@ -104,7 +104,29 @@ canvas{display:block;width:100%;height:100%}
 .note{flex:none;color:var(--muted);font-size:11px;line-height:14px;height:14px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}
 
-@media (prefers-reduced-motion:reduce){.price{transition:none}.live.blink{animation:none}}
+/* Fear & Greed panel */
+.sheet-bg{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+.sheet{width:100%;max-width:620px;max-height:100%;overflow-y:auto;background:#121214;border-top:1px solid var(--dim);border-radius:18px 18px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(22px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));animation:rise .25s ease;display:flex;flex-direction:column;gap:16px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center}
+.sheet-head h2{margin:0;font-size:17px;font-weight:700}
+.sheet-head button{width:32px;height:32px;border-radius:50%;background:#2c2c2e;color:#c7c7cc;font-size:15px}
+.fg-now{display:flex;align-items:baseline;gap:12px}
+.fg-now b{font-family:var(--price-font);font-size:64px;line-height:1}
+.fg-now span{font-size:20px;font-weight:600}
+.fg-bar{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,#e2505f 0%,#ec8a2a 30%,#d8c060 50%,#8fcf4a 70%,#3fbf3f 100%)}
+.fg-bar i{position:absolute;top:-5px;width:4px;height:20px;margin-left:-2px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px #121214}
+.fg-scale{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:-8px}
+.fg-hist{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fg-hist div{background:#1c1c1e;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.fg-hist small{color:var(--muted);font-size:12px}
+.fg-hist b{font-size:22px;font-family:var(--price-font)}
+.fg-hist span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fg-chart{height:120px}
+.fg-chart-lbl{color:var(--muted);font-size:12px;margin-bottom:-10px}
+.fg-about{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+@keyframes rise{from{transform:translateY(40px);opacity:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.price{transition:none}.live.blink{animation:none}.sheet,.sheet-bg{animation:none}}
 </style>
 </head>
 <body>
@@ -123,7 +145,7 @@ canvas{display:block;width:100%;height:100%}
 
   <div class="pills pad">
     <div class="pill-row">
-      <a class="pill fear num" id="fng" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" title="Open the Crypto Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></a>
+      <button class="pill fear num" id="fng" aria-haspopup="dialog" title="Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></button>
       <span class="pill num" id="dom" title="DOM: Bitcoin dominance, its share of the total crypto market"><span class="btc-ico">₿</span><span id="domTxt">DOM —</span></span>
       <span class="pill warn num" id="wide" title="VOLA: annualized volatility, the standard deviation of price returns over the selected period, scaled to one year">VOLA —</span>
     </div>
@@ -141,6 +163,19 @@ canvas{display:block;width:100%;height:100%}
         <div class="note" id="note"></div>
       </section>
 </main>
+
+<div class="sheet-bg" id="fgSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fgTitle">
+    <div class="sheet-head"><h2 id="fgTitle">Fear &amp; Greed Index</h2><button id="fgClose" aria-label="Close">✕</button></div>
+    <div class="fg-now num"><b id="fgNum">—</b><span id="fgCls">—</span></div>
+    <div class="fg-bar"><i id="fgMark" style="left:50%"></i></div>
+    <div class="fg-scale"><span>Extreme fear</span><span>Neutral</span><span>Extreme greed</span></div>
+    <div class="fg-hist num" id="fgHist"></div>
+    <div class="fg-chart-lbl">Last 30 days</div>
+    <div class="fg-chart"><canvas id="fgChart"></canvas></div>
+    <p class="fg-about">A daily score from 0 to 100 for the mood of the crypto market. Low scores mean investors are fearful; high scores mean they are greedy. It combines Bitcoin's volatility, trading volume, social media activity, dominance and search trends. Data from alternative.me, updated once a day.</p>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -368,7 +403,44 @@ function pushLivePrice() {
   last[4] = t.last; last[2] = Math.max(last[2], t.last); last[3] = Math.min(last[3], t.last);
 }
 
-let fngFull = null;
+let fngFull = null, fngHist = null;
+const fgColor = n => n < 25 ? "#e2505f" : n < 45 ? "#ec8a2a" : n <= 55 ? "#d8c060" : n <= 75 ? "#8fcf4a" : "#3fbf3f";
+function openFg() {
+  $("fgSheet").hidden = false;
+  const h = fngHist;
+  if (!h || !h.length) { $("fgNum").textContent = "—"; $("fgCls").textContent = "Could not load the index. Check your connection."; $("fgHist").innerHTML = ""; return; }
+  const n = +h[0].value;
+  $("fgNum").textContent = n; $("fgNum").style.color = fgColor(n);
+  $("fgCls").textContent = h[0].value_classification; $("fgCls").style.color = fgColor(n);
+  $("fgMark").style.left = n + "%";
+  $("fgHist").innerHTML = [["Yesterday", 1], ["Last week", 7], ["Last month", 30]].map(([lbl, i]) => {
+    const x = h[i]; if (!x) return `<div><small>${lbl}</small><b>—</b><span></span></div>`;
+    return `<div><small>${lbl}</small><b style="color:${fgColor(+x.value)}">${x.value}</b><span style="color:${fgColor(+x.value)}">${x.value_classification}</span></div>`;
+  }).join("");
+  drawFg();
+}
+function drawFg() {
+  const cvs = $("fgChart"), bx = cvs.parentElement, W = bx.clientWidth, H = bx.clientHeight, dpr = devicePixelRatio || 1;
+  cvs.width = W * dpr; cvs.height = H * dpr; const g = cvs.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pts = (fngHist || []).slice(0, 31).reverse().map(x => +x.value); if (pts.length < 2) return;
+  const lw = 26, X = i => i / (pts.length - 1) * (W - lw - 6) + 2, Y = v => 6 + (1 - v / 100) * (H - 12);
+  g.font = "11px " + getComputedStyle(document.body).fontFamily; g.textBaseline = "middle"; g.textAlign = "right";
+  for (const v of [0, 25, 50, 75, 100]) {
+    g.strokeStyle = "#2c2c2e"; g.setLineDash([3, 5]); g.beginPath(); g.moveTo(0, Y(v) + .5); g.lineTo(W - lw, Y(v) + .5); g.stroke();
+    g.setLineDash([]); g.fillStyle = "#8e8e93"; g.fillText(v, W, Y(v));
+  }
+  g.lineWidth = 2.5; g.lineJoin = g.lineCap = "round";
+  for (let i = 1; i < pts.length; i++) {   // colour each segment by its mood
+    g.strokeStyle = fgColor((pts[i] + pts[i - 1]) / 2);
+    g.beginPath(); g.moveTo(X(i - 1), Y(pts[i - 1])); g.lineTo(X(i), Y(pts[i])); g.stroke();
+  }
+  const li = pts.length - 1; g.fillStyle = fgColor(pts[li]); g.beginPath(); g.arc(X(li), Y(pts[li]), 4.5, 0, 7); g.fill();
+}
+const closeFg = () => { $("fgSheet").hidden = true; };
+$("fng").addEventListener("click", openFg);
+$("fgClose").addEventListener("click", closeFg);
+$("fgSheet").addEventListener("click", e => { if (e.target === $("fgSheet")) closeFg(); });
+addEventListener("keydown", e => { if (e.key === "Escape") closeFg(); });
 // Show the full Fear & Greed label, shortening "Extreme" to "Ext." when the pill row is too narrow
 function fitFng() {
   if (!fngFull) return;
@@ -378,7 +450,7 @@ function fitFng() {
 addEventListener("resize", fitFng);
 async function loadSentiment() {
   try {
-    const d = await j("https://api.alternative.me/fng/?limit=1"); const v = d.data[0];
+    const d = await j("https://api.alternative.me/fng/?limit=31"); const v = d.data[0]; fngHist = d.data;
     $("fngVal").textContent = v.value; fngFull = v.value_classification; fitFng();
     const n = +v.value; $("fng").className = "pill num " + (n < 45 ? "fear" : n > 55 ? "greed" : "neutral");
   } catch { $("fngTxt").textContent = "F&G n/a"; }
