@@ -287,6 +287,13 @@ const fmt = (v, cur = true) => {
   return x.toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
 };
 const fmtVol = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
+// Volume in BTC, shortened with K (thousand) / M (million): 424 BTC, 12.3K BTC
+const fmtVolU = v => {
+  if (v == null || !isFinite(v)) return "—";
+  const a = Math.abs(v), sh = a >= 1e6 ? [v / 1e6, "M"] : a >= 1e4 ? [v / 1e3, "K"] : [v, ""];
+  const n = sh[1] ? (Math.abs(sh[0]) >= 100 ? Math.round(sh[0]) : sh[0].toFixed(1)) : Math.round(sh[0]).toLocaleString("en-US");
+  return `${n}${sh[1]} BTC`;
+};
 
 /* ---------- build controls ---------- */
 function buildGroup(el, items, current, onPick) {
@@ -554,8 +561,9 @@ function draw() {
   const avgY = Math.round(vBot - vAvg / vMax * (vBot - vTop)) + .5;
   ctx.setLineDash([6, 6]); ctx.strokeStyle = "#636366"; ctx.beginPath(); ctx.moveTo(x0, avgY); ctx.lineTo(x1 + 4, avgY); ctx.stroke(); ctx.setLineDash([]);
   ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right";
-  ctx.fillText(fmtVol(vMax), W - 2, vTop); if (avgY - vTop > 16) ctx.fillText(fmtVol(vAvg), W - 2, avgY);
-  $("volAvg").textContent = "Avg " + fmtVol(vAvg);
+  const volLbl = (txt, y) => { const w = ctx.measureText(txt).width + 6; ctx.fillStyle = "#000"; ctx.fillRect(W - w - 2, y - 9, w + 2, 18); ctx.fillStyle = "#8e8e93"; ctx.fillText(txt, W - 2, y); };
+  volLbl(fmtVolU(vMax), vTop); if (avgY - vTop > 16) volLbl(fmtVolU(vAvg), avgY);
+  $("volAvg").textContent = "Avg " + fmtVolU(vAvg);
 
   geo = {X, Y, x0, x1, pTop, pBot, vBot, closes};
 
@@ -566,7 +574,7 @@ function draw() {
     ctx.strokeStyle = "#8e8e93"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + .5, pTop - 10); ctx.lineTo(x + .5, vBot); ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
     const tip = $("tip"), d = new Date(c[bi][0] * 1000);
-    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVol(vols[bi])}`;
+    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVolU(vols[bi])}`;
     tip.hidden = false;
     tip.style.left = Math.max(80, Math.min(W - 80, x)) + "px"; tip.style.top = Math.max(50, y - 14) + "px";
   } else $("tip").hidden = true;
