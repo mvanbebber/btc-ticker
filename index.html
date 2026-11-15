@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;700&display=swap">
 <style>
-/* Layout: white currency bar on top, black ticker body, canvas chart, pager dots. Single dark look. */
+/* Layout: white currency bar on top, black ticker body, canvas chart. Single dark look. */
 :root{
   --bg:#000; --top:#fff; --fg:#fff; --muted:#7c7c80; --dim:#3a3a3c;
   --accent:#ec5a2a; --up:#3fbf3f; --down:#e2505f; --fear:#e2505f; --trend:#f0a830;
@@ -71,6 +71,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .pill-scroll::-webkit-scrollbar{display:none}
 .pill{border:1.5px solid var(--dim);border-radius:999px;padding:clamp(5px,0.9dvh,8px) 14px;font-size:clamp(14px,3.9vw,17px);white-space:nowrap;display:inline-flex;align-items:center;gap:8px;flex:none;background:var(--bg)}
 .pill .sep{width:1px;height:18px;background:var(--dim)}
+a.pill{text-decoration:none;cursor:pointer}
+a.pill:hover{border-color:currentColor}
 .pill.fear{color:var(--fear)}
 .pill.greed{color:var(--up)}
 .pill.neutral{color:#d8c060}
@@ -84,11 +86,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .ranges button{font-family:var(--price-font);font-weight:700;font-size:clamp(13px,3.7vw,20px);color:#8e8e93;padding:4px 1px;flex:none}
 .ranges button[aria-pressed="true"]{color:var(--accent)}
 
-/* pages */
-.pager{overflow:hidden;margin-top:6px}
-main.wrap>.pager{flex:1;min-height:0}
-.track{display:flex;height:100%;transition:transform .35s ease;touch-action:none}
-.page{flex:0 0 100%;min-width:0;height:100%;display:flex;flex-direction:column}
+/* chart area fills the rest of the screen */
+main.wrap>.page{flex:1;min-height:0}
+.page{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px;padding-bottom:calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
 .chart-box{position:relative;flex:1;min-height:0}
 canvas{display:block;width:100%;height:100%}
 .vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:22px;font-size:clamp(15px,4.2vw,19px)}
@@ -100,21 +100,7 @@ canvas{display:block;width:100%;height:100%}
 .note{flex:none;color:var(--muted);font-size:11px;line-height:14px;height:14px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px}
 
-.dots{display:flex;justify-content:center;gap:22px;padding:clamp(6px,1.4dvh,14px) 0 calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
-.dots button{width:13px;height:13px;border-radius:50%;background:#48484a}
-.dots button[aria-current="true"]{background:#8e8e93}
-
-/* markets + trades */
-.list{width:100%;border-collapse:collapse;font-size:15px}
-.list th{color:var(--muted);font-weight:500;text-align:right;padding:10px 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #1c1c1e}
-.list th:first-child,.list td:first-child{text-align:left}
-.list td{padding:13px 4px;border-bottom:1px solid #1c1c1e;text-align:right;white-space:nowrap}
-.list tr.sel td:first-child{color:var(--accent)}
-.list tbody tr{cursor:pointer}
-.buy{color:var(--up)} .sell{color:var(--down)}
-.page h2{flex:none;font-size:15px;color:var(--muted);font-weight:600;margin:6px 0 6px;letter-spacing:.04em;text-transform:uppercase}
-.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
-@media (prefers-reduced-motion:reduce){.track{transition:none}.price{transition:none}.live.blink{animation:none}}
+@media (prefers-reduced-motion:reduce){.price{transition:none}.live.blink{animation:none}}
 </style>
 </head>
 <body>
@@ -132,26 +118,21 @@ canvas{display:block;width:100%;height:100%}
     <dl class="stats num">
       <dt>Max:</dt><dd id="max">—</dd>
       <dt>Min:</dt><dd id="min">—</dd>
-      <dt>Ask:</dt><dd id="ask">—</dd>
-      <dt>Bid:</dt><dd id="bid">—</dd>
     </dl>
   </section>
 
   <div class="pills pad">
     <div class="pill-scroll">
-      <span class="pill fear num" id="fng" title="Crypto Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></span>
+      <a class="pill fear num" id="fng" href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener" title="Open the Crypto Fear &amp; Greed Index"><span id="fngVal">—</span><span class="sep"></span><span id="fngTxt">Fear &amp; Greed</span></a>
       <span class="pill num" id="dom" title="Bitcoin market-cap dominance"><span class="btc-ico">₿</span><span id="domTxt">BTC —</span></span>
       <span class="pill warn num" id="wide" title="High–low range of the selected period, as a share of the low">WIDE —</span>
       <span class="pill num" id="d24" title="24-hour change">24H —</span>
     </div>
-    <button class="pill" id="tradesBtn" title="Show recent trades"><span class="dot"></span>Trades</button>
   </div>
 
   <div class="ranges pad" id="ranges" role="group" aria-label="Time range"></div>
 
-  <div class="pager" id="pager">
-    <div class="track" id="track">
-      <section class="page pad" aria-label="Chart">
+  <section class="page pad" aria-label="Chart">
         <div class="chart-box" id="chartBox">
           <canvas id="chart"></canvas>
           <div class="vol-chip" id="volChip"><span class="pill"><span class="dot"></span><b>VOL</b> ›</span><span class="avg num" id="volAvg">Avg —</span></div>
@@ -160,17 +141,6 @@ canvas{display:block;width:100%;height:100%}
         </div>
         <div class="note" id="note"></div>
       </section>
-      <section class="page pad" aria-label="Markets">
-        <h2>Markets</h2>
-        <div class="scroll"><table class="list num"><thead><tr><th>Exchange</th><th>Last</th><th>24H</th><th>Spread</th><th>Vol</th></tr></thead><tbody id="markets"></tbody></table></div>
-      </section>
-      <section class="page pad" aria-label="Trades">
-        <h2 id="tradesTitle">Recent trades</h2>
-        <div class="scroll"><table class="list num"><thead><tr><th>Time</th><th>Price</th><th>Amount BTC</th></tr></thead><tbody id="trades"></tbody></table></div>
-      </section>
-    </div>
-  </div>
-  <div class="dots" id="dots"></div>
 </main>
 
 <script>
@@ -219,10 +189,6 @@ const EX = {
       }
       const pages = await Promise.all(reqs);
       return pages.flat().map(r => [r[0], r[3], r[2], r[1], r[4], r[5]]);
-    },
-    async trades() {
-      const d = await j(CB + "/products/BTC-USD/trades?limit=60");
-      return d.map(x => ({t: Date.parse(x.time) / 1000, p:+x.price, q:+x.size, buy: x.side === "sell"}));
     }
   },
   kraken: {
@@ -237,11 +203,6 @@ const EX = {
       const d = await j(`${KR}/OHLC?pair=XBTUSD&interval=${iv/60}&since=${since}`);
       const rows = Object.entries(d.result).find(([k]) => k !== "last")[1];
       return rows.map(r => [+r[0], +r[1], +r[2], +r[3], +r[4], +r[6]]);
-    },
-    async trades() {
-      const d = await j(KR + "/Trades?pair=XBTUSD&count=60");
-      const rows = Object.entries(d.result).find(([k]) => k !== "last")[1];
-      return rows.map(r => ({t:+r[2], p:+r[0], q:+r[1], buy: r[3] === "b"}));
     }
   },
   bitstamp: {
@@ -255,10 +216,6 @@ const EX = {
       const start = Math.floor(Date.now() / 1000) - range;
       const d = await j(`${BS}/ohlc/btcusd/?step=${iv}&limit=1000&start=${start}`);
       return d.data.ohlc.map(r => [+r.timestamp, +r.open, +r.high, +r.low, +r.close, +r.volume]);
-    },
-    async trades() {
-      const d = await j(BS + "/transactions/btcusd/?time=hour");
-      return d.slice(0, 60).map(x => ({t:+x.date, p:+x.price, q:+x.amount, buy: String(x.type) === "0"}));
     }
   },
   bitfinex: {
@@ -273,10 +230,6 @@ const EX = {
       const start = (Math.floor(Date.now() / 1000) - range) * 1000;
       const d = await j(`${BF}/candles/trade:${tf[iv]}:tBTCUSD/hist?start=${start}&limit=10000&sort=1`);
       return d.map(r => [r[0] / 1000, r[1], r[3], r[4], r[2], r[5]]);
-    },
-    async trades() {
-      const d = await j(BF + "/trades/tBTCUSD/hist?limit=60");
-      return d.map(r => ({t:r[1] / 1000, p:r[3], q:Math.abs(r[2]), buy:r[2] > 0}));
     }
   },
   gemini: {
@@ -290,10 +243,6 @@ const EX = {
       const iv = pickIv(Object.keys(tf).map(Number), range, 100000);
       const d = await j(`${GM}/v2/candles/btcusd/${tf[iv]}`);
       return d.map(r => [r[0] / 1000, r[1], r[2], r[3], r[4], r[5]]);
-    },
-    async trades() {
-      const d = await j(GM + "/v1/trades/btcusd?limit_trades=60");
-      return d.map(x => ({t:x.timestampms / 1000, p:+x.price, q:+x.amount, buy: x.type === "buy"}));
     }
   },
   binance: {
@@ -308,10 +257,6 @@ const EX = {
       const start = Date.now() - range * 1000;
       const d = await j(`${BN}/klines?symbol=BTCUSDT&interval=${tf[iv]}&startTime=${start}&limit=1000`);
       return d.map(r => [r[0] / 1000, +r[1], +r[2], +r[3], +r[4], +r[5]]);
-    },
-    async trades() {
-      const d = await j(BN + "/trades?symbol=BTCUSDT&limit=60");
-      return d.reverse().map(x => ({t:x.time / 1000, p:+x.price, q:+x.qty, buy: !x.isBuyerMaker}));
     }
   }
 };
@@ -324,7 +269,7 @@ const store = {
 };
 const S = {
   cur: store.get("cur", "USD"), ex: store.get("ex", "bitstamp"), range: store.get("range", "1W"),
-  fx: {...STATIC_FX}, fxLive: false, ticker: null, candles: [], candleSrc: "", sample: false, page: 0, lastPrice: null
+  fx: {...STATIC_FX}, fxLive: false, ticker: null, candles: [], candleSrc: "", sample: false, lastPrice: null
 };
 if (!CURRENCIES.includes(S.cur)) S.cur = "USD";
 if (!EX[S.ex]) S.ex = "bitstamp";
@@ -355,33 +300,10 @@ function buildGroup(el, items, current, onPick) {
 }
 buildGroup($("currencies"), CURRENCIES.map(c => [c, c]), S.cur, k => { S.cur = k; store.set("cur", k); renderAll(); });
 buildGroup($("exchanges"), EX_KEYS.map(k => [k, EX[k].name]), S.ex, k => {
-  S.ex = k; store.set("ex", k); S.ticker = null; renderHead(); loadTicker(); loadCandles(); if (S.page === 2) loadTrades();
+  S.ex = k; store.set("ex", k); S.ticker = null; renderHead(); loadTicker(); loadCandles();
 });
 buildGroup($("ranges"), RANGES.map(r => [r[0], r[0]]), S.range, k => { S.range = k; store.set("range", k); loadCandles(); });
 $("exchanges").querySelector('[aria-pressed="true"]')?.scrollIntoView({inline: "center", block: "nearest"});
-
-/* ---------- pager ---------- */
-const dots = $("dots");
-["Chart","Markets","Trades"].forEach((n, i) => {
-  const b = document.createElement("button"); b.setAttribute("aria-label", n);
-  b.addEventListener("click", () => goPage(i)); dots.appendChild(b);
-});
-function goPage(i) {
-  S.page = Math.max(0, Math.min(2, i));
-  $("track").style.transform = `translateX(${-100 * S.page}%)`;
-  [...dots.children].forEach((d, k) => d.setAttribute("aria-current", k === S.page));
-  if (S.page === 1) loadMarkets();
-  if (S.page === 2) loadTrades();
-  if (S.page === 0) draw();
-}
-$("tradesBtn").addEventListener("click", () => goPage(S.page === 2 ? 0 : 2));
-let sx = null, sy = null;
-$("track").addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, {passive: true});
-$("track").addEventListener("touchend", e => {
-  if (sx == null) return;
-  const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
-  if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && !chartTouch) goPage(S.page + (dx < 0 ? 1 : -1));
-});
 
 /* ---------- data loading ---------- */
 async function loadFx() {
@@ -439,35 +361,6 @@ function pushLivePrice() {
   last[4] = t.last; last[2] = Math.max(last[2], t.last); last[3] = Math.min(last[3], t.last);
 }
 
-async function loadMarkets() {
-  const body = $("markets");
-  if (!body.children.length) body.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr>`;
-  const res = await Promise.all(EX_KEYS.map(k => EX[k].ticker().then(t => [k, t]).catch(() => [k, null])));
-  body.innerHTML = "";
-  for (const [k, t] of res) {
-    const tr = document.createElement("tr"); if (k === S.ex) tr.className = "sel";
-    const ch = t && t.open ? (t.last / t.open - 1) * 100 : null;
-    const spread = t ? (t.ask - t.bid) : null;
-    tr.innerHTML = `<td>${EX[k].name}</td><td>${t ? fmt(t.last) : "—"}</td>` +
-      `<td class="${ch == null ? "" : ch < 0 ? "sell" : "buy"}">${ch == null ? "—" : (ch > 0 ? "+" : "") + ch.toFixed(2) + "%"}</td>` +
-      `<td>${t ? fmt(spread) : "—"}</td><td>${t ? fmtVol(t.vol) : "unavailable"}</td>`;
-    tr.addEventListener("click", () => { $("exchanges").querySelector(`[data-key="${k}"]`).click(); goPage(0); });
-    body.appendChild(tr);
-  }
-}
-
-async function loadTrades() {
-  const body = $("trades"); $("tradesTitle").textContent = "Recent trades · " + EX[S.ex].name;
-  let list;
-  try { list = await EX[S.ex].trades(); } catch { list = null; }
-  if (!list) { body.innerHTML = `<tr><td colspan="3" style="color:var(--muted)">Trades from ${EX[S.ex].name} could not be loaded. Retrying…</td></tr>`; return; }
-  list.sort((a, b) => b.t - a.t);
-  body.innerHTML = list.slice(0, 60).map(x => {
-    const d = new Date(x.t * 1000);
-    return `<tr><td>${d.toLocaleTimeString("en-GB")}</td><td class="${x.buy ? "buy" : "sell"}">${fmt(x.p)}</td><td>${x.q.toFixed(5)}</td></tr>`;
-  }).join("");
-}
-
 async function loadSentiment() {
   try {
     const d = await j("https://api.alternative.me/fng/?limit=1"); const v = d.data[0];
@@ -516,8 +409,6 @@ function renderHead() {
     $("max").textContent = fmt(hi); $("min").textContent = fmt(lo);
     $("wide").textContent = `WIDE ${((hi - lo) / lo * 100).toFixed(1)}%`;
   }
-  $("ask").textContent = t ? fmt(t.ask) : "—";
-  $("bid").textContent = t ? fmt(t.bid) : "—";
   $("vol24").textContent = t ? fmtVol(t.vol) : "—";
   if (t && t.open) {
     const p = (t.last / t.open - 1) * 100, e = $("d24");
@@ -529,7 +420,7 @@ function renderHead() {
   if (S.cur !== "USD") notes.push(`Converted from USD at ${S.fx[S.cur].toFixed(S.fx[S.cur] > 20 ? 1 : 3)} ${S.cur}${S.fxLive ? "" : " (approximate rate)"}.`);
   $("note").textContent = notes.join(" ");
 }
-function renderAll() { renderHead(); draw(); if (S.page === 1) loadMarkets(); }
+function renderAll() { renderHead(); draw(); }
 
 /* ---------- render: chart ---------- */
 const cv = $("chart"), ctx = cv.getContext("2d"), box = $("chartBox");
@@ -684,11 +575,10 @@ cv.style.touchAction = "none";
 new ResizeObserver(() => draw()).observe(box);
 
 /* ---------- boot + polling ---------- */
-goPage(0); renderHead();
+renderHead();
 loadFx(); loadTicker(); loadCandles(); loadSentiment();
 setInterval(() => { if (!document.hidden) { loadTicker(); draw(); } }, 5000);
 setInterval(() => { if (!document.hidden) loadCandles(); }, 60000);
-setInterval(() => { if (!document.hidden && S.page === 2) loadTrades(); if (!document.hidden && S.page === 1) loadMarkets(); }, 6000);
 setInterval(() => { if (!document.hidden) loadSentiment(); }, 600000);
 setInterval(() => { if (!document.hidden) loadFx(); }, 3600000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadTicker(); loadCandles(); } });
