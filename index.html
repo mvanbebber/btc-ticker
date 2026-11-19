@@ -41,7 +41,7 @@
 /* Layout: white currency bar on top, black ticker body, canvas chart. Single dark look. */
 :root{
   --bg:#000; --top:#fff; --fg:#fff; --muted:#7c7c80; --dim:#3a3a3c;
-  --accent:#ec5a2a; --up:#3fbf3f; --down:#e2505f; --fear:#e2505f; --trend:#f0a830;
+  --accent:#ec5a2a; --up:#3fbf3f; --down:#e2505f; --fear:#e2505f;
   --price-font:"Roboto Condensed","SF Pro Display",-apple-system,"Helvetica Neue",Arial,sans-serif;
   --ui-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   color-scheme:dark;
@@ -307,7 +307,7 @@ const EX = {
     },
     async candles(range) {
       const iv = pickIv([60,180,300,900,1800,3600,7200,14400,21600,43200,86400,259200], range, 1000);
-      const start = Math.floor(Date.now() / 1000) - range;
+      const start = Math.floor(Date.now() / 1000) - Math.min(range, 999 * iv);   // newest 1000 points at most
       const d = await j(`${BS}/ohlc/btcusd/?step=${iv}&limit=1000&start=${start}`);
       return d.data.ohlc.map(r => [+r.timestamp, +r.open, +r.high, +r.low, +r.close, +r.volume]);
     }
@@ -348,7 +348,7 @@ const EX = {
     async candles(range) {
       const tf = {60:"1m",180:"3m",300:"5m",900:"15m",1800:"30m",3600:"1h",7200:"2h",14400:"4h",21600:"6h",43200:"12h",86400:"1d",259200:"3d",604800:"1w"};
       const iv = pickIv(Object.keys(tf).map(Number), range, 1000);
-      const start = Date.now() - range * 1000;
+      const start = Date.now() - Math.min(range, 999 * iv) * 1000;   // newest 1000 points at most
       const d = await j(`${BN}/klines?symbol=BTCUSDT&interval=${tf[iv]}&startTime=${start}&limit=1000`);
       return d.map(r => [r[0] / 1000, +r[1], +r[2], +r[3], +r[4], +r[5]]);
     }
@@ -362,6 +362,7 @@ const store = {
   set(k, v) { try { localStorage.setItem("btct." + k, v); } catch {} }
 };
 const S = {
+  ma: null,
   cur: store.get("cur", "USD"), ex: store.get("ex", "bitstamp"), range: store.get("range", "1W"),
   fx: {...STATIC_FX}, fxLive: false, ticker: null, candles: [], candleSrc: "", sample: false, lastPrice: null
 };
@@ -474,6 +475,45 @@ async function loadCandles() {
   if (src === "sample") S.ticker = sampleTicker();
   $("loading").hidden = true;
   pushLivePrice(); renderAll();
+  if (src === "sample") { S.ma = null; draw(); } else loadMA();
+}
+
+/* 200-week moving average: the average closing price of the previous 200 weeks, at every point on the chart.
+   Needs about 3.8 years of history before the chart starts, so it is loaded separately. */
+const WK200 = 200 * 7 * 86400, maCache = {};
+let maSeq = 0;
+function rollingMA(c) {
+  const ma = []; let sum = 0, j = 0;
+  for (let i = 0; i < c.length; i++) {
+    sum += c[i][4];
+    while (c[j][0] <= c[i][0] - WK200) { sum -= c[j][4]; j++; }
+    if (c[i][0] - c[0][0] >= WK200 * 0.97) ma.push([c[i][0], sum / (i - j + 1)]);   // only once a full 200 weeks is covered
+  }
+  return ma;
+}
+async function loadMA() {
+  const range = RANGES.find(r => r[0] === S.range)[1], key = S.ex + ":" + S.range, seq = ++maSeq;
+  const hit = maCache[key];
+  if (hit && Date.now() - hit.at < 1800000) { S.ma = hit.ma; draw(); return; }
+  const get = async ex => {
+    const c = (await EX[ex].candles(range + WK200)).filter(k => isFinite(k[4])).sort((a, b) => a[0] - b[0]);
+    const ma = rollingMA(c);
+    if (!ma.length || ma[0][0] > Date.now() / 1000 - range * 0.5 || ma[ma.length - 1][0] < Date.now() / 1000 - 14 * 86400) throw new Error("not enough history");
+    return ma;
+  };
+  let ma = null;
+  try { ma = await get(S.ex); } catch { if (S.ex !== "binance") { try { ma = await get("binance"); } catch {} } }
+  if (seq !== maSeq) return;
+  S.ma = ma; maCache[key] = {at: Date.now(), ma}; draw();
+}
+// MA value at time t, interpolated between its points; null before the MA starts
+function maAt(t) {
+  const m = S.ma; if (!m || !m.length || t < m[0][0]) return null;
+  if (t >= m[m.length - 1][0]) return m[m.length - 1][1];
+  let lo = 0, hi = m.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid][0] <= t) lo = mid; else hi = mid; }
+  const f = (t - m[lo][0]) / (m[hi][0] - m[lo][0] || 1);
+  return m[lo][1] + (m[hi][1] - m[lo][1]) * f;
 }
 
 function pushLivePrice() {
@@ -764,8 +804,17 @@ function draw() {
   const closes = c.map(k => k[4] * R);
   const hi = Math.max(...c.map(k => k[2])) * R, lo = Math.min(...closes, ...c.map(k => k[3] * R).slice(-1));
   const minC = Math.min(...closes), maxC = Math.max(...closes, hi);
-  const lowV = Math.min(minC, lo), padV = (maxC - lowV) * 0.04 || 1;
-  const yMin = lowV - padV, yMax = hi;
+  const maV = S.ma ? c.map(k => { const v = maAt(k[0]); return v == null ? null : v * R; }) : null;
+  const maDef = maV ? maV.filter(v => v != null) : [];
+  let lowV = Math.min(minC, lo), topV = hi, maOff = 0;
+  if (maDef.length) {
+    const mMin = Math.min(...maDef), mMax = Math.max(...maDef), span = topV - lowV;
+    // fit the MA into the chart if that stretches the price scale by no more than 60%; otherwise show where it is
+    if (Math.max(topV, mMax) - Math.min(lowV, mMin) <= span * 1.6) { lowV = Math.min(lowV, mMin); topV = Math.max(topV, mMax); }
+    else maOff = mMax < lowV ? -1 : mMin > topV ? 1 : 0;
+  }
+  const padV = (topV - lowV) * 0.04 || 1;
+  const yMin = lowV - padV, yMax = topV;
   const Y = v => pBot - (v - yMin) / (yMax - yMin) * (pBot - pTop);
 
   ctx.textBaseline = "middle";
@@ -783,26 +832,34 @@ function draw() {
   ctx.setLineDash([3, 5]); ctx.textAlign = "left";
   const step = niceStep(yMax - yMin, Math.max(2, Math.min(4, Math.floor((pBot - pTop) / 42))));
   const labels = [[yMax, true]];
-  for (let v = Math.ceil(yMin / step) * step; v < yMax; v += step) if (Y(v) - Y(yMax) > 26) labels.push([v, false]);
+  for (let v = Math.max(0, Math.ceil(yMin / step) * step); v < yMax; v += step) if (Y(v) - Y(yMax) > 26) labels.push([v, false]);
   const lastY = Y(closes[closes.length - 1]);
   for (const [v] of labels) {
     const y = Math.round(Y(v)) + .5;
     ctx.strokeStyle = "#333"; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1 + 4, y); ctx.stroke();
-    if (Math.abs(y - lastY) > 22) { ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right"; ctx.fillText(fmt(v, false), W - 2, y); }
+    if (Math.abs(y - lastY) > 22) { ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right"; ctx.fillText(v === 0 ? "0" : fmt(v, false), W - 2, y); }
   }
   ctx.setLineDash([]);
 
-  // resistance-style trend line: regression of closes, lifted to the highest residual
-  const n = closes.length; let sx = 0, sy = 0, sxy = 0, sxx = 0;
-  closes.forEach((v, i) => { sx += i; sy += v; sxy += i * v; sxx += i * i; });
-  const m = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), b0 = (sy - m * sx) / n;
-  const lift = Math.max(...closes.map((v, i) => v - (m * i + b0)));
-  const tl = i => m * i + b0 + lift;
-  ctx.save(); ctx.beginPath(); ctx.rect(0, pTop - 20, x1 + 4, pBot - pTop + 30); ctx.clip();
-  ctx.setLineDash([9, 7]); ctx.strokeStyle = "#f0a830"; ctx.lineWidth = 2;
-  const ext = n * 0.03;
-  ctx.beginPath(); ctx.moveTo(X(t0) - (x1 - x0) * 0.03, Y(tl(-ext))); ctx.lineTo(x1, Y(tl(n - 1 + ext))); ctx.stroke();
-  ctx.restore(); ctx.setLineDash([]);
+  const n = closes.length;
+
+  // 200-week moving average
+  const MA_COLOR = "#5aa9ff", maNow = maDef.length ? maDef[maDef.length - 1] : null;
+  if (maDef.length && !maOff) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, pTop - 20, x1 + 2, pBot - pTop + 30); ctx.clip();
+    ctx.strokeStyle = MA_COLOR; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.beginPath();
+    let on = false;
+    c.forEach((k, i) => { const v = maV[i]; if (v == null) { on = false; return; } const x = X(k[0]), y = Y(v); on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; });
+    ctx.stroke(); ctx.restore();
+  }
+  if (maNow != null) {   // legend, top left
+    const txt = `200W MA ${SYMBOL[S.cur]}${fmt(maNow, false)}` + (maOff < 0 ? "  ↓ below chart" : maOff > 0 ? "  ↑ above chart" : "");
+    ctx.save(); ctx.font = `600 ${Math.round(Math.min(13, W * 0.034))}px ${getComputedStyle(document.body).fontFamily}`;
+    const tw = ctx.measureText(txt).width;
+    ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(0, 0, tw + 28, 18);
+    ctx.strokeStyle = MA_COLOR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(2, 9); ctx.lineTo(16, 9); ctx.stroke();
+    ctx.fillStyle = MA_COLOR; ctx.textAlign = "left"; ctx.fillText(txt, 22, 9.5); ctx.restore();
+  }
 
   // price line: brown under-shadow + green line
   const path = off => { ctx.beginPath(); c.forEach((k, i) => { const x = X(k[0]), y = Y(closes[i]) + off; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); };
@@ -840,7 +897,7 @@ function draw() {
     ctx.strokeStyle = "#8e8e93"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + .5, pTop - 10); ctx.lineTo(x + .5, vBot); ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
     const tip = $("tip"), d = new Date(c[bi][0] * 1000);
-    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVolU(vols[bi])}`;
+    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVolU(vols[bi])}${maV && maV[bi] != null ? `<br><span style="color:#5aa9ff">200W MA ${SYMBOL[S.cur]}${fmt(maV[bi], false)}</span>` : ""}`;
     tip.hidden = false;
     tip.style.left = Math.max(80, Math.min(W - 80, x)) + "px"; tip.style.top = Math.max(50, y - 14) + "px";
   } else $("tip").hidden = true;
