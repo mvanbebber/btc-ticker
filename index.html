@@ -76,7 +76,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
 /* headline */
-.head{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,0.6dvh,6px) 16px;padding-top:clamp(8px,2.4dvh,24px);align-items:baseline}
+.head{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,0.6dvh,6px) 16px;padding-top:clamp(8px,2.4dvh,24px);align-items:center}
 .price-row{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:clamp(4px,1.5vw,10px);min-width:0;margin-bottom:clamp(2px,1dvh,10px)}
 /* currency symbol before the price; grey until live prices arrive, then white */
 .live{font-family:var(--price-font);font-weight:700;font-size:clamp(23px,min(8.8vw,5dvh),51px);line-height:1;transform:translateY(-0.04em);color:var(--muted);flex:none;transition:color .3s}
@@ -91,6 +91,10 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .kv .k{color:var(--muted)}
 .kv.r{justify-content:space-between;gap:12px}
 .chg.down{color:var(--down)} .chg.up{color:var(--up)}
+/* price change for the selected range: big amount, then percent and period */
+.chg-box{grid-row:span 2;min-width:0;align-self:center}
+.chg-big{font-family:var(--price-font);font-weight:700;font-size:clamp(24px,min(8.4vw,4.6dvh),42px);line-height:1;white-space:nowrap}
+.chg-sub{color:var(--muted);font-size:clamp(14px,min(4vw,2.3dvh),19px);margin-top:3px;white-space:nowrap}
 
 /* pills */
 .pills{display:flex;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
@@ -173,9 +177,8 @@ canvas{display:block;width:100%;height:100%}
 
   <section class="head pad">
     <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span><span class="live live-pad" id="livePad" aria-hidden="true">$</span></div>
-    <div class="kv num"><span class="k"><span id="rangeLbl">1W</span>:</span><span class="chg" id="chg">—</span></div>
+    <div class="chg-box num"><div class="chg-big chg" id="chg">—</div><div class="chg-sub"><span class="chg" id="chgPct"></span> <span id="rangeLbl">past week</span></div></div>
     <div class="kv r num"><span class="k">Max</span><span id="max">—</span></div>
-    <div class="kv num"><span class="k">24H Vol:</span><span id="vol24">—</span></div>
     <div class="kv r num"><span class="k">Min</span><span id="min">—</span></div>
   </section>
 
@@ -246,6 +249,8 @@ const RANGES = [
   ["1M",2592000],["3M",7776000],["6M",15552000],["1Y",31536000],["2Y",63072000],["5Y",157680000],["10Y",315360000]
 ];
 const SYMBOL = {USD:"$", EUR:"€", BRL:"R$", CAD:"C$", CNY:"CN¥", JPY:"¥"};
+const RANGE_WORDS = {"1D":"past 24 hours","1W":"past week","1M":"past month","3M":"past 3 months","6M":"past 6 months",
+  "1Y":"past year","2Y":"past 2 years","5Y":"past 5 years","10Y":"past 10 years"};
 const STATIC_FX = {USD:1,EUR:0.92,BRL:5.4,CAD:1.38,CNY:7.2,JPY:150};
 
 const j = async (url) => {
@@ -711,16 +716,18 @@ function renderHead() {
   S.lastPrice = price;
   document.title = price != null ? `${SYMBOL[S.cur]}${fmt(price)} · BTC Ticker` : "BTC Ticker · Live Bitcoin Price, No Ads";
 
-  $("rangeLbl").textContent = S.range;
+  $("rangeLbl").textContent = RANGE_WORDS[S.range] || S.range;
   if (c.length && price != null) {
     const first = c[0][1] || c[0][4], diff = price - first, pct = diff / first * 100;
-    const ce = $("chg"); ce.className = "chg " + (diff < 0 ? "down" : "up");
-    ce.textContent = `${diff >= 0 ? "+" : "−"}${money(Math.abs(diff))} ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
+    const ce = $("chg"); ce.className = "chg-big chg " + (diff < 0 ? "down" : "up");
+    ce.textContent = `${diff >= 0 ? "+" : "−"}${money(Math.abs(diff))}`;
+    const cp = $("chgPct"); cp.className = "chg " + (diff < 0 ? "down" : "up");
+    cp.textContent = `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}%`;
+    fitChg();
     const hi = Math.max(...c.map(x => x[2])), lo = Math.min(...c.map(x => x[3]));
     $("max").textContent = money(hi); $("min").textContent = money(lo);
     const v = annualVol(c); $("wide").textContent = v == null ? "VOLA —" : `VOLA ${v.toFixed(v < 10 ? 1 : 0)}%`; fitFng();
   }
-  $("vol24").textContent = t && isFinite(t.vol) ? fmtVol(t.vol) + " BTC" : "—";
   const notes = [];
   if (S.candleSrc === "sample") notes.push("Live data unavailable — showing sample data.");
   else if (S.candleSrc.includes("fallback")) notes.push(`Chart from ${S.candleSrc}; ${EX[S.ex].name} history could not be loaded.`);
@@ -741,6 +748,13 @@ function fitPrice() {
   }
 }
 addEventListener("resize", fitPrice);
+// Shrink the change amount if a long number (e.g. yen over 10 years) would run into Max/Min
+function fitChg() {
+  const el = $("chg"); el.style.fontSize = "";
+  for (let i = 0; i < 4 && el.scrollWidth > el.parentElement.clientWidth; i++)
+    el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * 0.97 * el.parentElement.clientWidth / el.scrollWidth + "px";
+}
+addEventListener("resize", fitChg);
 function renderAll() { renderHead(); draw(); }
 
 /* ---------- render: chart ---------- */
