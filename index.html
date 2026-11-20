@@ -121,10 +121,6 @@ main.wrap>.page{flex:1;min-height:0;padding-right:max(4px,env(safe-area-inset-ri
 .page{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:6px;padding-bottom:calc(clamp(8px,2dvh,20px) + env(safe-area-inset-bottom,0px))}
 .chart-box{position:relative;flex:1;min-height:0}
 canvas{display:block;width:100%;height:100%}
-.vol-chip{position:absolute;left:0;display:flex;align-items:center;gap:16px;font-size:clamp(14px,3.8vw,17px)}
-.vol-tag{display:inline-flex;align-items:center;gap:7px;font-weight:700;color:var(--fg);letter-spacing:.04em}
-.vol-tag .dot{width:9px;height:9px;border-radius:50%;background:#c7c7cc}
-.vol-chip .avg{color:#c7c7cc}
 .tip{position:absolute;pointer-events:none;background:#1c1c1e;border:1px solid var(--dim);border-radius:8px;padding:6px 9px;font-size:13px;white-space:nowrap;transform:translate(-50%,-100%)}
 .tip b{display:block;font-size:15px}
 .note{flex:none;color:var(--muted);font-size:11px;line-height:14px;height:14px;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -192,7 +188,6 @@ canvas{display:block;width:100%;height:100%}
   <section class="page pad" aria-label="Chart">
         <div class="chart-box" id="chartBox">
           <canvas id="chart"></canvas>
-          <div class="vol-chip" id="volChip"><span class="vol-tag"><span class="dot"></span>VOL</span><span class="avg num" id="volAvg">Avg —</span></div>
           <div class="tip" id="tip" hidden></div>
           <div class="loading" id="loading">Loading chart…</div>
         </div>
@@ -381,13 +376,6 @@ const fmt = (v, cur = true) => {
 // Amount with the currency sign in front, e.g. $76,422 or R$407,485 (converts from USD like fmt)
 const money = (v, cur = true) => v == null || !isFinite(v) ? "—" : SYMBOL[S.cur] + fmt(v, cur);
 const fmtVol = v => v == null ? "—" : Math.round(v).toLocaleString("en-US");
-// Volume in BTC, shortened with K (thousand) / M (million): 424 BTC, 12.3K BTC
-const fmtVolU = v => {
-  if (v == null || !isFinite(v)) return "—";
-  const a = Math.abs(v), sh = a >= 1e6 ? [v / 1e6, "M"] : a >= 1e4 ? [v / 1e3, "K"] : [v, ""];
-  const n = sh[1] ? (Math.abs(sh[0]) >= 100 ? Math.round(sh[0]) : sh[0].toFixed(1)) : Math.round(sh[0]).toLocaleString("en-US");
-  return `${n}${sh[1]} BTC`;
-};
 
 /* ---------- build controls ---------- */
 function buildGroup(el, items, current, onPick) {
@@ -795,9 +783,7 @@ function draw() {
   const maxLbl = fmt(Math.max(...c.map(k => k[2])) * R * 1.02, false);
   const tagW = Math.ceil(ctx.measureText(maxLbl).width) + 14;
   const x0 = 2, x1 = W - tagW - 4;
-  const vBot = H - 30, vTop = Math.min(H * 0.76, vBot - 44), chipH = $("volChip").offsetHeight || 36;
-  const pTop = 22, pBot = Math.min(H * 0.62, vTop - chipH - 14), vChipY = (pBot + vTop) / 2;
-  $("volChip").style.top = (vChipY - chipH / 2) + "px";
+  const pTop = 24, pBot = H - 36, vBot = pBot + 6;   // price chart fills the whole box; dates sit below
 
   const t0 = c[0][0], t1 = c[c.length - 1][0];
   const X = t => x0 + (t - t0) / (t1 - t0 || 1) * (x1 - x0);
@@ -876,18 +862,6 @@ function draw() {
   roundRect(tx, ty, tw, th, 6); ctx.fill();
   ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.fillText(tagTxt, W - 7, ty + th / 2 + 1);
 
-  // volume
-  const vols = c.map(k => k[5] || 0), vMax = Math.max(...vols) || 1, vAvg = vols.reduce((a, b) => a + b, 0) / vols.length;
-  const bw = Math.max(1, Math.min(6, (x1 - x0) / n * 0.55));
-  ctx.fillStyle = "#d1d1d6";
-  c.forEach((k, i) => { const h = (vols[i] / vMax) * (vBot - vTop); ctx.fillRect(Math.round(X(k[0]) - bw / 2), vBot - h, bw, h); });
-  const avgY = Math.round(vBot - vAvg / vMax * (vBot - vTop)) + .5;
-  ctx.setLineDash([6, 6]); ctx.strokeStyle = "#636366"; ctx.beginPath(); ctx.moveTo(x0, avgY); ctx.lineTo(x1 + 4, avgY); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#8e8e93"; ctx.textAlign = "right";
-  const volLbl = (txt, y) => { const w = ctx.measureText(txt).width + 6; ctx.fillStyle = "#000"; ctx.fillRect(W - w - 2, y - 9, w + 2, 18); ctx.fillStyle = "#8e8e93"; ctx.fillText(txt, W - 2, y); };
-  volLbl(fmtVolU(vMax), vTop); if (avgY - vTop > 16) volLbl(fmtVolU(vAvg), avgY);
-  $("volAvg").textContent = "Avg " + fmtVolU(vAvg);
-
   geo = {X, Y, x0, x1, pTop, pBot, vBot, closes};
 
   // crosshair
@@ -897,7 +871,7 @@ function draw() {
     ctx.strokeStyle = "#8e8e93"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + .5, pTop - 10); ctx.lineTo(x + .5, vBot); ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
     const tip = $("tip"), d = new Date(c[bi][0] * 1000);
-    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})} · Vol ${fmtVolU(vols[bi])}${maV && maV[bi] != null ? `<br><span style="color:#5aa9ff">200W MA ${SYMBOL[S.cur]}${fmt(maV[bi], false)}</span>` : ""}`;
+    tip.innerHTML = `<b class="num">${fmt(closes[bi], false)} ${S.cur}</b>${d.toLocaleString("en-GB", {day:"2-digit", month:"short", year: (t1 - t0) > 3e7 ? "numeric" : undefined, hour: (t1 - t0) < 8e6 ? "2-digit" : undefined, minute: (t1 - t0) < 8e6 ? "2-digit" : undefined})}${maV && maV[bi] != null ? `<br><span style="color:#5aa9ff">200W MA ${SYMBOL[S.cur]}${fmt(maV[bi], false)}</span>` : ""}`;
     tip.hidden = false;
     tip.style.left = Math.max(80, Math.min(W - 80, x)) + "px"; tip.style.top = Math.max(50, y - 14) + "px";
   } else $("tip").hidden = true;
