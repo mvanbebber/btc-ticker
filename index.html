@@ -95,8 +95,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-r
 .chg-box{grid-row:span 2;min-width:0;align-self:center}
 .chg-line{display:flex;align-items:baseline;gap:.35em;white-space:nowrap;font-size:clamp(24px,min(8.4vw,4.6dvh),42px)}
 .chg-big{font-family:var(--price-font);font-weight:700;font-size:1em;line-height:1}
-.chg-pct{font-family:var(--price-font);font-weight:700;font-size:.62em}
-.chg-sub{color:var(--muted);font-size:clamp(14px,min(4vw,2.3dvh),19px);margin-top:3px;white-space:nowrap}
+.chg-pct{font-family:var(--price-font);font-weight:700;font-size:1em;line-height:1}
+.chg-sub{color:var(--muted);font-size:clamp(14px,min(4vw,2.3dvh),19px);margin-bottom:3px;white-space:nowrap}
 
 /* pills */
 .pills{display:flex;margin-top:clamp(8px,2.6dvh,26px);align-items:center}
@@ -179,7 +179,7 @@ canvas{display:block;width:100%;height:100%}
 
   <section class="head pad">
     <div class="price-row"><span class="live" id="live" title="Grey: waiting for live prices. White: live.">$</span><span class="price num" id="price">—</span><span class="live live-pad" id="livePad" aria-hidden="true">$</span></div>
-    <div class="chg-box num"><div class="chg-line" id="chgLine"><span class="chg-big chg" id="chg">—</span><span class="chg-pct chg" id="chgPct"></span></div><div class="chg-sub" id="rangeLbl">past week</div></div>
+    <div class="chg-box num"><div class="chg-sub" id="rangeLbl">past week</div><div class="chg-line" id="chgLine"><span class="chg-big chg" id="chg">—</span><span class="chg-pct chg" id="chgPct"></span></div></div>
     <div class="kv r num"><span class="k">Max</span><span id="max">—</span></div>
     <div class="kv r num"><span class="k">Min</span><span id="min">—</span></div>
   </section>
